@@ -23,7 +23,7 @@ import {
 import { 
   MapPin, Plus, Search, Users, Video, Image as ImageIcon, User, Navigation,
   ThumbsUp, ThumbsDown, X, MessageCircle, PlayCircle, ShieldCheck, 
-  Settings, ChevronLeft, ChevronRight, Zap, Globe, Trash2
+  Settings, ChevronLeft, ChevronRight, Zap, Globe, AlertCircle
 } from 'lucide-react';
 
 const InstagramIcon = ({ size = 24 }) => (
@@ -115,6 +115,7 @@ export default function App() {
   const [isAddingVideo, setIsAddingVideo] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [cityFilter, setCityFilter] = useState('All');
+  const [loginError, setLoginError] = useState(null);
   
   const [newSpot, setNewSpot] = useState({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
   const [newVideo, setNewVideo] = useState({ title: '', youtubeUrl: '' });
@@ -164,7 +165,17 @@ export default function App() {
   }, []);
 
   const handleLogin = async () => {
-    try { await signInWithPopup(auth, provider); } catch (e) { console.error(e); }
+    try { 
+      setLoginError(null);
+      await signInWithPopup(auth, provider); 
+    } catch (e) { 
+      console.error(e);
+      if (e.code === 'auth/unauthorized-domain') {
+        setLoginError("Dominio no autorizado. Agregá el link de Vercel en tu Firebase Console.");
+      } else {
+        setLoginError("Error al iniciar sesión: " + e.message);
+      }
+    }
   };
 
   const handleLogout = () => { signOut(auth); setUser(null); setUserProfile(null); };
@@ -212,6 +223,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans pb-24 selection:bg-red-600">
+      
+      {loginError && (
+        <div className="bg-red-600 text-white p-3 text-center text-xs font-black uppercase flex items-center justify-center gap-2 sticky top-0 z-[100]">
+          <AlertCircle size={16} /> {loginError}
+          <X size={16} className="cursor-pointer ml-4" onClick={() => setLoginError(null)} />
+        </div>
+      )}
+
       <nav className="sticky top-0 z-50 bg-black/95 border-b border-zinc-900 px-6 py-4 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('explore')}>
@@ -268,7 +287,6 @@ export default function App() {
           </div>
         </div>
 
-        {}
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
@@ -333,7 +351,6 @@ export default function App() {
         )}
       </main>
 
-      {}
       {isAddingSpot && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
