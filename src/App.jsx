@@ -318,7 +318,7 @@ export default function App() {
           </div>
 
           {!user ? (
-            <Button onClick={() => signInWithPopup(auth, provider)}>Login Google</Button>
+            <Button onClick={() => signInWithPopup(auth, provider).catch(e => setLoginError(e.message))}>Login Google</Button>
           ) : (
             <button onClick={() => setIsEditingProfile(true)} className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
