@@ -99,6 +99,8 @@ export default function App() {
   const [adminEmailsInput, setAdminEmailsInput] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
 
+  const [searchAddress, setSearchAddress] = useState('');
+  const [searchStatus, setSearchStatus] = useState('');
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -187,6 +189,42 @@ export default function App() {
     });
   };
 
+  const handleSearchAddress = async () => {
+    if (!searchAddress || !window.L) return;
+    setSearchStatus('Buscando...');
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const pos = [parseFloat(lat), parseFloat(lon)];
+        mapRef.current.setView(pos, 16);
+        markerRef.current.setLatLng(pos);
+        setNewSpot(prev => ({ ...prev, lat: lat, lng: lon }));
+        setSearchStatus('Ubicación fijada ✓');
+      } else {
+        setSearchStatus('No se encontró el lugar');
+      }
+    } catch (e) {
+      setSearchStatus('Error en búsqueda');
+    }
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) return setSearchStatus('GPS no soportado');
+    setSearchStatus('Capturando GPS...');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      const coords = [latitude, longitude];
+      mapRef.current.setView(coords, 16);
+      markerRef.current.setLatLng(coords);
+      setNewSpot(prev => ({ ...prev, lat: latitude.toFixed(6), lng: longitude.toFixed(6) }));
+      setSearchStatus('Ubicación GPS fijada ✓');
+    }, () => {
+      setSearchStatus('Error al obtener GPS');
+    });
+  };
+
   const extractVideoId = (url) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
@@ -201,7 +239,6 @@ export default function App() {
       const videoId = extractVideoId(newVideo.youtubeUrl);
       if (!videoId) throw new Error("URL de YouTube inválida");
 
-      // GUARDAR EN FIREBASE (Para que todos lo vean y persista)
       await addDoc(collection(db, 'videos'), {
         ...newVideo,
         videoId,
@@ -210,7 +247,6 @@ export default function App() {
         createdAt: new Date().toISOString()
       });
       
-      // LIMPIAR Y CERRAR AL INSTANTE
       setNewVideo({ title: '', youtubeUrl: '' });
       setIsAddingVideo(false);
     } catch (error) {
@@ -297,7 +333,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Content */}
+      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
@@ -314,7 +350,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Dynamic sections rendering... */}
+        {/* Dynamic List Rendering */}
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
@@ -368,7 +404,7 @@ export default function App() {
         )}
       </main>
 
-      {}
+      {/* Modals */}
       {isAddingVideo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl">
@@ -439,7 +475,7 @@ export default function App() {
 
               <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none h-24 text-sm text-white border border-zinc-800" placeholder="Detalles de seguridad..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
 
-              {}
+              {/* Location Section */}
               <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 space-y-3">
                 <p className="text-[10px] font-black uppercase text-red-600 tracking-widest flex items-center gap-2">
                   <MapPin size={12}/> Ubicación
@@ -457,14 +493,14 @@ export default function App() {
                 </div>
                 {searchStatus && <p className="text-[9px] font-bold uppercase text-center text-red-600 animate-pulse">{searchStatus}</p>}
                 
-                <div id="map-container" className="h-[200px] rounded-xl overflow-hidden border border-zinc-800" />
+                <div ref={mapContainerRef} className="h-[200px] rounded-xl overflow-hidden border border-zinc-800" />
                 
                 <button type="button" onClick={handleGetCurrentLocation} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all">
                   <Zap size={14} className="text-red-600" /> Usar mi GPS actual
                 </button>
               </div>
 
-              {}
+              {/* Images Section */}
               <div className="space-y-2">
                 <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Imágenes (Links de Drive/Web)</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -482,7 +518,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Mobile Nav Bar */}
+      {/* Mobile Nav */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-40 bg-zinc-950/80 backdrop-blur-xl p-3 rounded-3xl border border-zinc-800 shadow-2xl">
          <button onClick={() => setActiveTab('explore')} className={`p-4 rounded-2xl transition-all ${activeTab === 'explore' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><MapPin size={24}/></button>
          <button onClick={() => setActiveTab('riders')} className={`p-4 rounded-2xl transition-all ${activeTab === 'riders' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><Users size={24}/></button>
