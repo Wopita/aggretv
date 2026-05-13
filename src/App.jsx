@@ -35,6 +35,8 @@ const PROVINCIAS_ARGENTINA = [
   "Santa Fe", "Santiago del Estero", "Tierra del Fuego", "Tucumán"
 ];
 
+const SPOT_TYPES = ["Skatepark", "Baranda", "Borde/Murete", "Escaleras", "Rampa/Gap", "Piso Liso"];
+
 const InstagramIcon = ({ size = 24 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -105,6 +107,7 @@ export default function App() {
   const [isAddingVideo, setIsAddingVideo] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingRiderByAdmin, setIsEditingRiderByAdmin] = useState(false);
+  const [isEditingSpotByAdmin, setIsEditingSpotByAdmin] = useState(false);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [selectedRider, setSelectedRider] = useState(null);
   
@@ -115,6 +118,7 @@ export default function App() {
   const [newVideo, setNewVideo] = useState({ title: '', youtubeUrl: '' });
   const [editProfile, setEditProfile] = useState({ name: '', city: '', province: 'Neuquén', instagram: '', whatsapp: '', bio: '', photoUrl: '' });
   const [adminEditingRiderData, setAdminEditingRiderData] = useState(null);
+  const [adminEditingSpotData, setAdminEditingSpotData] = useState(null);
   
   const [adminEmailsInput, setAdminEmailsInput] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
@@ -336,6 +340,17 @@ export default function App() {
     } finally { setIsLoading(false); }
   };
 
+  const handleAdminSaveSpot = async (e) => {
+    e.preventDefault();
+    if (!adminEditingSpotData) return;
+    setIsLoading(true);
+    try {
+      await updateDoc(doc(db, 'spots', adminEditingSpotData.id), adminEditingSpotData);
+      setIsEditingSpotByAdmin(false);
+      setSelectedSpot(null);
+    } finally { setIsLoading(false); }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-24 font-sans">
       
@@ -383,7 +398,7 @@ export default function App() {
       </div>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {}
+        {/* Header Hero */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
             <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : 'Videos'}</h2>
@@ -401,7 +416,7 @@ export default function App() {
           </div>
         </div>
 
-        {}
+        {/* Explore Spots Grid */}
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => provinceFilter === 'All' || s.province === provinceFilter).map(spot => (
@@ -424,7 +439,7 @@ export default function App() {
           </div>
         )}
 
-        {}
+        {/* Riders Grid */}
         {activeTab === 'riders' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {riders.filter(r => provinceFilter === 'All' || r.province === provinceFilter).map(rider => (
@@ -444,7 +459,7 @@ export default function App() {
           </div>
         )}
 
-        {}
+        {/* Videos Grid */}
         {activeTab === 'videos' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {videos.map(vid => (
@@ -484,14 +499,38 @@ export default function App() {
               <p className="text-zinc-300 text-sm italic border-l-4 border-red-600 pl-6 leading-relaxed">"{selectedSpot.description}"</p>
               <div className="pt-4 flex gap-4">
                  <Button onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${selectedSpot.lat},${selectedSpot.lng}`, '_blank')} className="flex-1">ABRIR MAPA</Button>
-                 {isUserAdmin && <Button variant="danger" onClick={() => { deleteDoc(doc(db, 'spots', selectedSpot.id)); setSelectedSpot(null); }} className="w-14 p-0"><Trash2 size={20} /></Button>}
+                 
+                 {isUserAdmin && (
+                   <div className="flex gap-2">
+                     <Button variant="secondary" onClick={() => { setAdminEditingSpotData(selectedSpot); setIsEditingSpotByAdmin(true); }} className="w-14 p-0"><Edit3 size={20} /></Button>
+                     <Button variant="danger" onClick={() => { deleteDoc(doc(db, 'spots', selectedSpot.id)); setSelectedSpot(null); }} className="w-14 p-0"><Trash2 size={20} /></Button>
+                   </div>
+                 )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {}
+      {isEditingSpotByAdmin && adminEditingSpotData && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
+          <div className="bg-zinc-950 border border-red-600 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
+            <button onClick={() => setIsEditingSpotByAdmin(false)} className="absolute top-6 right-6 z-[260] bg-red-600 p-4 rounded-full"><X size={24} className="text-white" /></button>
+            <h3 className="text-3xl font-black italic uppercase mb-8 text-white">Editar <span className="text-red-600">Spot</span></h3>
+            <form onSubmit={handleAdminSaveSpot} className="space-y-6">
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none focus:ring-1 ring-red-600" placeholder="Nombre" value={adminEditingSpotData.title} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, title: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" placeholder="Ciudad" value={adminEditingSpotData.city} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, city: e.target.value})} />
+                <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingSpotData.province} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, province: e.target.value})}>{PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}</select>
+              </div>
+              <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingSpotData.type} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, type: e.target.value})}>{SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none h-24 text-xs" placeholder="Descripción..." value={adminEditingSpotData.description} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, description: e.target.value})} />
+              <Button type="submit" className="w-full py-5" isLoading={isLoading}>ACTUALIZAR SPOT</Button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {selectedRider && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
           <div className="bg-zinc-950 border border-zinc-800 p-10 rounded-[3rem] w-full max-w-md relative text-center">
@@ -519,7 +558,7 @@ export default function App() {
         </div>
       )}
 
-      {}
+      {/* Formulario Nuevo Spot */}
       {isAddingSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
           <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
@@ -599,7 +638,7 @@ export default function App() {
         </div>
       )}
 
-      { }
+      {/* Modal Edición Rider por Admin */}
       {isEditingRiderByAdmin && adminEditingRiderData && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
           <div className="bg-zinc-950 border border-red-600 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
@@ -631,7 +670,7 @@ export default function App() {
         </div>
       )}
 
-      {}
+      {/* Modal Nuevo Video */}
       {isAddingVideo && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-lg shadow-2xl relative text-white">
