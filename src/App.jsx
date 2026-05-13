@@ -1,29 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged,
-  signOut 
+  getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut 
 } from 'firebase/auth';
 import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  addDoc, 
-  onSnapshot, 
-  updateDoc, 
-  increment,
-  setDoc,
-  getDoc,
-  query,
-  orderBy
+  getFirestore, collection, doc, addDoc, onSnapshot, updateDoc, 
+  increment, setDoc, getDoc, query, orderBy
 } from 'firebase/firestore';
 import { 
   MapPin, Plus, Search, Users, Video, Image as ImageIcon, User, Navigation,
-  ThumbsUp, ThumbsDown, X, MessageCircle, PlayCircle, ShieldCheck, 
-  Settings, ChevronLeft, ChevronRight, Zap, Globe, AlertCircle, Target, Loader2, MousePointer2
+  ThumbsUp, X, MessageCircle, PlayCircle, ShieldCheck, 
+  Settings, ChevronLeft, ChevronRight, Zap, Globe, AlertCircle, Loader2
 } from 'lucide-react';
 
 const firebaseConfig = {
@@ -64,6 +51,37 @@ const Button = ({ children, variant = 'primary', isLoading = false, className = 
   );
 };
 
+const ImageCarousel = ({ images }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  if (!images || images.length === 0) return (
+    <div className="w-full h-64 flex flex-col items-center justify-center opacity-20 bg-zinc-900">
+      <ImageIcon size={48} />
+      <span className="text-[10px] font-black uppercase mt-2">Sin Imágenes</span>
+    </div>
+  );
+
+  return (
+    <div className="relative w-full h-64 group/carousel overflow-hidden bg-black">
+      <img src={images[currentIndex]} className="w-full h-full object-cover" alt="Spot" />
+      {images.length > 1 && (
+        <>
+          <button onClick={() => setCurrentIndex(prev => (prev - 1 + images.length) % images.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full hover:bg-red-600 transition-colors">
+            <ChevronLeft size={16} />
+          </button>
+          <button onClick={() => setCurrentIndex(prev => (prev + 1) % images.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full hover:bg-red-600 transition-colors">
+            <ChevronRight size={16} />
+          </button>
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {images.map((_, i) => (
+              <div key={i} className={`h-1 rounded-full transition-all ${i === currentIndex ? 'w-4 bg-red-600' : 'w-1 bg-white/30'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -81,11 +99,16 @@ export default function App() {
   const [loginError, setLoginError] = useState(null);
 
   const [newSpot, setNewSpot] = useState({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
+  const [newVideo, setNewVideo] = useState({ title: '', youtubeUrl: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [searchStatus, setSearchStatus] = useState('');
   const [editProfile, setEditProfile] = useState({ name: '', city: 'Neuquén Capital', instagram: '', whatsapp: '', bio: '' });
   const [adminEmailsInput, setAdminEmailsInput] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
+
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
 
   const isUserAdmin = useMemo(() => {
     if (!user) return false;
@@ -137,6 +160,46 @@ export default function App() {
     return () => unsubAuth();
   }, []);
 
+  useEffect(() => {
+    if (isAddingSpot && !window.L) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = initMap;
+      document.head.appendChild(script);
+    } else if (isAddingSpot) {
+      setTimeout(initMap, 100);
+    }
+  }, [isAddingSpot]);
+
+  const initMap = () => {
+    if (!mapContainerRef.current || !window.L) return;
+    if (mapRef.current) return;
+
+    const L = window.L;
+    const initialLat = -38.95;
+    const initialLng = -68.05;
+
+    mapRef.current = L.map(mapContainerRef.current).setView([initialLat, initialLng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapRef.current);
+
+    markerRef.current = L.marker([initialLat, initialLng], { draggable: true }).addTo(mapRef.current);
+    
+    markerRef.current.on('dragend', () => {
+      const pos = markerRef.current.getLatLng();
+      setNewSpot(prev => ({ ...prev, lat: pos.lat.toFixed(6), lng: pos.lng.toFixed(6) }));
+    });
+
+    mapRef.current.on('click', (e) => {
+      markerRef.current.setLatLng(e.latlng);
+      setNewSpot(prev => ({ ...prev, lat: e.latlng.lat.toFixed(6), lng: e.latlng.lng.toFixed(6) }));
+    });
+  };
+
   const handleSearchLocation = async () => {
     if (!searchQuery) return;
     setSearchStatus('Buscando...');
@@ -145,7 +208,12 @@ export default function App() {
       const data = await response.json();
       if (data && data.length > 0) {
         const { lat, lon } = data[0];
-        setNewSpot(prev => ({ ...prev, lat, lng: lon }));
+        const newPos = [parseFloat(lat), parseFloat(lon)];
+        setNewSpot(prev => ({ ...prev, lat: lat, lng: lon }));
+        if (mapRef.current) {
+          mapRef.current.setView(newPos, 16);
+          markerRef.current.setLatLng(newPos);
+        }
         setSearchStatus('✅ Ubicación fijada');
       } else {
         setSearchStatus('❌ No se encontró');
@@ -155,16 +223,26 @@ export default function App() {
     }
   };
 
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) return setSearchStatus('❌ GPS no soportado');
+    setSearchStatus('Ubicando...');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      setNewSpot(prev => ({ ...prev, lat: latitude.toFixed(6), lng: longitude.toFixed(6) }));
+      if (mapRef.current) {
+        mapRef.current.setView([latitude, longitude], 16);
+        markerRef.current.setLatLng([latitude, longitude]);
+      }
+      setSearchStatus('✅ GPS Fijado');
+    }, () => setSearchStatus('❌ Error GPS'));
+  };
+
   const handleLogin = async () => {
     try {
       setLoginError(null);
       await signInWithPopup(auth, provider);
     } catch (error) {
-      if (error.code === 'auth/unauthorized-domain') {
-        setLoginError("URL no autorizada en Firebase. Agregala en Authorized Domains.");
-      } else {
-        setLoginError("Error de login: " + error.message);
-      }
+      setLoginError(error.message);
     }
   };
 
@@ -183,26 +261,41 @@ export default function App() {
     });
     setIsLoading(false);
     setIsAddingSpot(false);
+    mapRef.current = null;
     setNewSpot({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
+  };
+
+  const handleAddVideo = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    const videoId = newVideo.youtubeUrl.split('v=')[1]?.split('&')[0] || newVideo.youtubeUrl.split('/').pop();
+    await addDoc(collection(db, 'videos'), {
+      ...newVideo,
+      videoId,
+      creatorId: user.uid,
+      creatorName: userProfile.name,
+      createdAt: new Date().toISOString()
+    });
+    setIsLoading(false);
+    setIsAddingVideo(false);
+    setNewVideo({ title: '', youtubeUrl: '' });
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     await setDoc(doc(db, 'profiles', user.uid), editProfile);
-    
     if (user.email === ROOT_ADMIN) {
       await setDoc(doc(db, 'settings', 'global'), { 
         logoUrl: editLogoUrl,
         adminList: adminEmailsInput
       }, { merge: true });
     }
-    
     setUserProfile(editProfile);
     setIsEditingProfile(false);
   };
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-20">
+    <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-20 font-sans">
       
       {loginError && (
         <div className="bg-red-600 p-4 text-center font-black uppercase text-xs sticky top-0 z-[100] flex items-center justify-center gap-4">
@@ -221,7 +314,7 @@ export default function App() {
           
           <div className="hidden md:flex gap-8">
             {['explore', 'riders', 'media'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-red-600 border-b-2 border-red-600 pb-1' : 'text-zinc-500 hover:text-white'}`}>{tab === 'explore' ? 'Spots' : tab}</button>
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-red-600 border-b-2 border-red-600 pb-1' : 'text-zinc-500 hover:text-white'}`}>{tab === 'explore' ? 'Spots' : tab === 'media' ? 'Media' : 'Riders'}</button>
             ))}
           </div>
 
@@ -241,8 +334,8 @@ export default function App() {
         </div>
       </nav>
 
+      {}
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
             <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : 'Media'}</h2>
@@ -254,6 +347,7 @@ export default function App() {
               {CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             {user && activeTab === 'explore' && <Button onClick={() => setIsAddingSpot(true)}><Plus size={20}/> SUMAR SPOT</Button>}
+            {user && activeTab === 'media' && <Button onClick={() => setIsAddingVideo(true)}><Video size={20}/> SUBIR VIDEO</Button>}
           </div>
         </div>
 
@@ -262,16 +356,21 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
               <div key={spot.id} className="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden group hover:border-red-600 transition-all">
-                <div className="h-64 bg-zinc-900 relative">
-                   {spot.images?.[0] ? <img src={spot.images[0]} className="w-full h-full object-cover" alt="spot" /> : <div className="w-full h-full flex items-center justify-center opacity-20"><ImageIcon size={48}/></div>}
-                   {spot.creatorId === user?.uid || isUserAdmin ? (
-                      <button onClick={async () => { if(confirm("Borrar?")) await updateDoc(doc(db, 'spots', spot.id), { deleted: true }) }} className="absolute top-4 right-4 bg-black/60 p-2 rounded-lg text-white hover:text-red-600"><X size={16}/></button>
-                   ) : null}
-                </div>
+                <ImageCarousel images={spot.images} />
                 <div className="p-6 space-y-4">
-                  <h3 className="text-2xl font-black uppercase italic group-hover:text-red-600 leading-tight">{spot.title}</h3>
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-2xl font-black uppercase italic group-hover:text-red-600 transition-colors leading-tight">{spot.title}</h3>
+                    <div className="flex gap-2">
+                      <button onClick={() => updateDoc(doc(db, 'spots', spot.id), { votesUp: increment(1) })} className="bg-zinc-900 p-2 rounded-lg text-xs font-black flex items-center gap-2 hover:bg-red-600 transition-colors">
+                        <ThumbsUp size={14} /> {spot.votesUp || 0}
+                      </button>
+                      {(spot.creatorId === user?.uid || isUserAdmin) && (
+                        <button onClick={async () => { if(confirm("¿Borrar spot?")) await updateDoc(doc(db, 'spots', spot.id), { deleted: true }) }} className="bg-zinc-900 p-2 rounded-lg text-zinc-500 hover:text-white transition-colors"><X size={14}/></button>
+                      )}
+                    </div>
+                  </div>
                   <p className="text-zinc-500 text-[10px] font-black uppercase flex items-center gap-2"><MapPin size={12} className="text-red-600" /> {spot.city} • {spot.type}</p>
-                  <p className="text-zinc-400 text-sm italic border-l-2 border-zinc-800 pl-3">"{spot.description}"</p>
+                  <p className="text-zinc-400 text-sm italic border-l-2 border-zinc-800 pl-3 line-clamp-2">"{spot.description}"</p>
                   <Button variant="secondary" className="w-full text-[10px]" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${spot.lat},${spot.lng}`, '_blank')}>ABRIR MAPA</Button>
                 </div>
               </div>
@@ -279,44 +378,80 @@ export default function App() {
           </div>
         )}
 
+        {}
         {activeTab === 'riders' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {riders.filter(r => cityFilter === 'All' || r.city === cityFilter).map(rider => (
               <div key={rider.uid} className="bg-zinc-950 border border-zinc-900 p-8 rounded-2xl text-center space-y-4 hover:border-red-600 transition-all group">
                 <div className="w-20 h-20 mx-auto bg-zinc-900 border-2 border-red-600 rounded-3xl flex items-center justify-center overflow-hidden">
-                  <User size={30} className="text-red-600" />
+                   <User size={30} className="text-red-600" />
                 </div>
-                <h4 className="font-black italic uppercase text-lg">{rider.name}</h4>
-                <p className="text-zinc-500 text-[9px] font-black uppercase">{rider.city}</p>
+                <div>
+                  <h4 className="font-black italic uppercase text-lg">{rider.name}</h4>
+                  <p className="text-zinc-500 text-[9px] font-black uppercase mt-1">{rider.city}</p>
+                </div>
+                <div className="flex justify-center gap-2">
+                   {rider.instagram && <button onClick={() => window.open(`https://instagram.com/${rider.instagram}`)} className="p-2 bg-zinc-900 rounded-lg hover:bg-red-600"><Search size={14}/></button>}
+                   {rider.whatsapp && <button onClick={() => window.open(`https://wa.me/${rider.whatsapp}`)} className="p-2 bg-zinc-900 rounded-lg hover:bg-red-600"><MessageCircle size={14}/></button>}
+                </div>
               </div>
+            ))}
+          </div>
+        )}
+
+        {}
+        {activeTab === 'media' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {videos.map(vid => (
+               <div key={vid.id} className="bg-zinc-950 border border-zinc-900 rounded-3xl overflow-hidden">
+                  <div className="aspect-video bg-black">
+                    <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${vid.videoId}`} frameBorder="0" allowFullScreen title={vid.title}></iframe>
+                  </div>
+                  <div className="p-6">
+                    <h4 className="font-black uppercase italic text-xl">{vid.title}</h4>
+                    <p className="text-zinc-500 text-[9px] font-black uppercase mt-2">Rider: {vid.creatorName}</p>
+                  </div>
+               </div>
             ))}
           </div>
         )}
       </main>
 
-      {/* Modals */}
+      {}
       {isAddingSpot && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
-          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-4xl font-black italic uppercase">Nuevo <span className="text-red-600">Spot</span></h3>
-              <button onClick={() => setIsAddingSpot(false)} className="bg-zinc-900 p-2 rounded-xl hover:text-red-600"><X/></button>
+              <button onClick={() => {setIsAddingSpot(false); mapRef.current = null;}} className="bg-zinc-900 p-2 rounded-xl hover:text-red-600"><X/></button>
             </div>
-            <form onSubmit={handleAddSpot} className="space-y-4">
+            <form onSubmit={handleAddSpot} className="space-y-6">
               <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Nombre del Spot" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
+              
               <div className="grid grid-cols-2 gap-4">
                 <select className="bg-zinc-900 p-4 rounded-xl outline-none" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
                 <select className="bg-zinc-900 p-4 rounded-xl outline-none" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
               </div>
+
               <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none h-24 text-sm" placeholder="Detalles de seguridad..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
               
               <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 space-y-4">
-                <p className="text-[10px] font-black uppercase text-red-600">Ubicación</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] font-black uppercase text-red-600">Ubicación exacta</p>
+                  <button type="button" onClick={handleUseCurrentLocation} className="text-[9px] font-black uppercase bg-zinc-800 px-3 py-1 rounded-lg hover:text-red-600 transition-colors">Usar mi ubicación GPS</button>
+                </div>
                 <div className="flex gap-2">
-                  <input className="flex-1 bg-black p-3 rounded-xl text-xs outline-none" placeholder="Dirección o lugar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), handleSearchLocation())} />
+                  <input className="flex-1 bg-black p-3 rounded-xl text-xs outline-none" placeholder="Buscá dirección o lugar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), handleSearchLocation())} />
                   <button type="button" onClick={handleSearchLocation} className="bg-red-600 p-3 rounded-xl"><Search size={16}/></button>
                 </div>
-                <span className="text-[9px] font-bold text-white/40 block text-center uppercase tracking-widest">{searchStatus || "Buscá o usá el GPS de abajo"}</span>
+                <div ref={mapContainerRef} className="h-[250px] w-full rounded-xl overflow-hidden border border-zinc-800 relative bg-zinc-900">
+                   {!window.L && <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-600 uppercase">Cargando Mapa...</div>}
+                </div>
+                <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                  <span>Lat: {newSpot.lat || '---'}</span>
+                  <span className="text-red-600">{searchStatus}</span>
+                  <span>Lng: {newSpot.lng || '---'}</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -328,9 +463,27 @@ export default function App() {
         </div>
       )}
 
+      {}
+      {isAddingVideo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-black italic uppercase">Subir <span className="text-red-600">Video</span></h3>
+              <button onClick={() => setIsAddingVideo(false)}><X/></button>
+            </div>
+            <form onSubmit={handleAddVideo} className="space-y-4">
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Título del Video" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Link de YouTube" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
+              <Button type="submit" className="w-full" isLoading={isLoading}>PUBLICAR VIDEO</Button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {}
       {isEditingProfile && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md bg-black/95">
-          <div className="bg-zinc-950 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-lg">
+          <div className="bg-zinc-950 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-lg shadow-2xl">
             <div className="flex justify-between items-center mb-8">
                <h3 className="text-4xl font-black italic uppercase">Mi <span className="text-red-600">Perfil</span></h3>
                <button onClick={() => setIsEditingProfile(false)} className="bg-zinc-900 p-2 rounded-xl"><X/></button>
@@ -338,6 +491,17 @@ export default function App() {
             <form onSubmit={handleSaveProfile} className="space-y-6">
               <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Alias" value={editProfile.name} onChange={e => setEditProfile({...editProfile, name: e.target.value})} />
               
+              <select className="w-full bg-zinc-900 p-4 rounded-xl outline-none" value={editProfile.city} onChange={e => setEditProfile({...editProfile, city: e.target.value})}>
+                {CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-xs" placeholder="Instagram (@...)" value={editProfile.instagram} onChange={e => setEditProfile({...editProfile, instagram: e.target.value})} />
+                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-xs" placeholder="WhatsApp" value={editProfile.whatsapp} onChange={e => setEditProfile({...editProfile, whatsapp: e.target.value})} />
+              </div>
+
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none h-24 text-xs" placeholder="Bio corta..." value={editProfile.bio} onChange={e => setEditProfile({...editProfile, bio: e.target.value})} />
+
               {user.email === ROOT_ADMIN && (
                 <div className="p-6 bg-red-950/10 rounded-2xl border border-red-900/30 space-y-6">
                    <p className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2"><ShieldCheck size={16}/> Configuración Root</p>
@@ -358,6 +522,14 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Mobile Nav */}
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-40 bg-zinc-950/80 backdrop-blur-xl p-3 rounded-3xl border border-zinc-800 shadow-2xl">
+         <button onClick={() => setActiveTab('explore')} className={`p-4 rounded-2xl transition-all ${activeTab === 'explore' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><MapPin size={24}/></button>
+         <button onClick={() => setActiveTab('riders')} className={`p-4 rounded-2xl transition-all ${activeTab === 'riders' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><Users size={24}/></button>
+         <button onClick={() => setActiveTab('media')} className={`p-4 rounded-2xl transition-all ${activeTab === 'media' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><PlayCircle size={24}/></button>
+      </div>
+
     </div>
   );
 }
