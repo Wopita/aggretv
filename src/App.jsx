@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore';
 import { 
   MapPin, Plus, Search, Users, Video, Image as ImageIcon, User, Navigation,
-  ThumbsUp, X, MessageCircle, PlayCircle, ShieldCheck, 
+  ThumbsUp, X, MessageCircle, PlayCircle, ShieldCheck, Camera,
   Settings, ChevronLeft, ChevronRight, Zap, Globe, AlertCircle, Loader2, Trash2, Edit3
 } from 'lucide-react';
 
@@ -104,7 +104,6 @@ export default function App() {
   const [videos, setVideos] = useState([]);
   const [appSettings, setAppSettings] = useState({ logoUrl: '', adminList: '' });
   
-  // Modals
   const [isAddingSpot, setIsAddingSpot] = useState(false);
   const [isAddingVideo, setIsAddingVideo] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -117,6 +116,7 @@ export default function App() {
   const [newSpot, setNewSpot] = useState({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
   const [newVideo, setNewVideo] = useState({ title: '', youtubeUrl: '' });
   const [editProfile, setEditProfile] = useState({ name: '', city: 'Neuquén Capital', instagram: '', whatsapp: '', bio: '', photoUrl: '' });
+  
   const [adminEmailsInput, setAdminEmailsInput] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
 
@@ -133,6 +133,50 @@ export default function App() {
     return extraAdmins.includes(user.email?.toLowerCase());
   }, [user, appSettings.adminList]);
 
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Compresión 60%
+          resolve(dataUrl);
+        };
+      };
+    });
+  };
+
+  const handleImageUpload = async (e, index, isSpot = true) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsLoading(true);
+    const compressed = await compressImage(file);
+    if (isSpot) {
+      const newImgs = [...newSpot.images];
+      newImgs[index] = compressed;
+      setNewSpot({ ...newSpot, images: newImgs });
+    } else {
+      setEditProfile({ ...editProfile, photoUrl: compressed });
+    }
+    setIsLoading(false);
+  };
+
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -140,8 +184,9 @@ export default function App() {
         const profileRef = doc(db, 'profiles', u.uid);
         const snap = await getDoc(profileRef);
         if (snap.exists()) {
-          setUserProfile(snap.data());
-          setEditProfile(snap.data());
+          const data = snap.data();
+          setUserProfile(data);
+          setEditProfile(data);
         } else {
           const initialData = { name: u.displayName || 'Rider', city: 'Neuquén Capital', uid: u.uid, photoUrl: u.photoURL || '' };
           await setDoc(profileRef, initialData);
@@ -224,62 +269,27 @@ export default function App() {
         setNewSpot(prev => ({ ...prev, lat: lat, lng: lon }));
         setSearchStatus('Ubicación fijada ✓');
       } else {
-        setSearchStatus('No se encontró el lugar');
+        setSearchStatus('No se encontró');
       }
-    } catch (e) {
-      setSearchStatus('Error en búsqueda');
-    }
+    } catch (e) { setSearchStatus('Error'); }
   };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) return setSearchStatus('GPS no soportado');
-    setSearchStatus('Capturando GPS...');
+    setSearchStatus('Capturando...');
     navigator.geolocation.getCurrentPosition((pos) => {
       const { latitude, longitude } = pos.coords;
       const coords = [latitude, longitude];
       mapRef.current.setView(coords, 16);
       markerRef.current.setLatLng(coords);
       setNewSpot(prev => ({ ...prev, lat: latitude.toFixed(6), lng: longitude.toFixed(6) }));
-      setSearchStatus('Ubicación GPS fijada ✓');
-    }, () => setSearchStatus('Error al obtener GPS'));
-  };
-
-  const handleDeleteSpot = async (id, e) => {
-    e.stopPropagation();
-    if (confirm("¿Seguro querés borrar este spot?")) {
-      await deleteDoc(doc(db, 'spots', id));
-      if (selectedSpot?.id === id) setSelectedSpot(null);
-    }
-  };
-
-  const handleAddVideo = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-      const match = newVideo.youtubeUrl.match(regExp);
-      const videoId = (match && match[2].length === 11) ? match[2] : null;
-      if (!videoId) throw new Error("URL de YouTube inválida");
-      
-      await addDoc(collection(db, 'videos'), {
-        ...newVideo,
-        videoId,
-        creatorId: user.uid,
-        creatorName: userProfile?.name || 'Rider',
-        createdAt: new Date().toISOString()
-      });
-      setNewVideo({ title: '', youtubeUrl: '' });
-      setIsAddingVideo(false);
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setIsLoading(false);
-    }
+      setSearchStatus('GPS fijado ✓');
+    }, () => setSearchStatus('Error GPS'));
   };
 
   const handleAddSpot = async (e) => {
     e.preventDefault();
-    if (!newSpot.lat || !newSpot.lng) return alert('⚠️ Buscá una ubicación en el mapa');
+    if (!newSpot.lat || !newSpot.lng) return;
     setIsLoading(true);
     try {
       const validImages = newSpot.images.filter(url => url.trim() !== '');
@@ -293,30 +303,46 @@ export default function App() {
       });
       setIsAddingSpot(false);
       setNewSpot({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
-    } catch (error) {
-      alert("Error al subir: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error) { console.error(error); } finally { setIsLoading(false); }
+  };
+
+  const handleAddVideo = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+      const match = newVideo.youtubeUrl.match(regExp);
+      const videoId = (match && match[2].length === 11) ? match[2] : null;
+      if (!videoId) return;
+      await addDoc(collection(db, 'videos'), {
+        ...newVideo,
+        videoId,
+        creatorId: user.uid,
+        creatorName: userProfile?.name || 'Rider',
+        createdAt: new Date().toISOString()
+      });
+      setIsAddingVideo(false);
+      setNewVideo({ title: '', youtubeUrl: '' });
+    } catch (error) { console.error(error); } finally { setIsLoading(false); }
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    await setDoc(doc(db, 'profiles', user.uid), editProfile);
-    if (user.email === ROOT_ADMIN) {
-      await setDoc(doc(db, 'settings', 'global'), { 
-        logoUrl: editLogoUrl,
-        adminList: adminEmailsInput
-      }, { merge: true });
-    }
-    setUserProfile(editProfile);
-    setIsEditingProfile(false);
+    setIsLoading(true);
+    try {
+      await setDoc(doc(db, 'profiles', user.uid), editProfile);
+      if (user.email === ROOT_ADMIN) {
+        await setDoc(doc(db, 'settings', 'global'), { logoUrl: editLogoUrl, adminList: adminEmailsInput }, { merge: true });
+      }
+      setUserProfile(editProfile);
+      setIsEditingProfile(false);
+    } finally { setIsLoading(false); }
   };
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-24 font-sans">
       
-      {/* Navegación Desktop */}
+      {/* Navegación Fija Desktop */}
       <nav className="sticky top-0 z-[100] bg-black/95 border-b border-zinc-900 px-6 py-4 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('explore')}>
@@ -346,7 +372,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Navegación Mobile (Sticky Bottom) */}
+      {/* Navegación Mobile Barra Inferior */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-[150] bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800 px-6 py-4 flex justify-around items-center">
         <button onClick={() => setActiveTab('explore')} className={`flex flex-col items-center gap-1 ${activeTab === 'explore' ? 'text-red-600' : 'text-zinc-500'}`}>
           <MapPin size={24} />
@@ -362,7 +388,6 @@ export default function App() {
         </button>
       </div>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
@@ -379,14 +404,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* Grillas */}
+        {}
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
               <div key={spot.id} onClick={() => setSelectedSpot(spot)} className="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden group hover:border-red-600 transition-all cursor-pointer">
-                <div className="h-56">
-                  <ImageCarousel images={spot.images} />
-                </div>
+                <div className="h-56"><ImageCarousel images={spot.images} /></div>
                 <div className="p-6 space-y-4">
                   <div className="flex justify-between items-start">
                     <h3 className="text-2xl font-black uppercase italic group-hover:text-red-600 transition-colors leading-tight">{spot.title}</h3>
@@ -394,7 +417,7 @@ export default function App() {
                       <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'spots', spot.id), { votesUp: increment(1) }) }} className="bg-zinc-900 p-2 rounded-lg text-xs font-black flex items-center gap-2 hover:bg-red-600 transition-colors">
                         <ThumbsUp size={14} /> {spot.votesUp || 0}
                       </button>
-                      {isUserAdmin && <button onClick={(e) => handleDeleteSpot(spot.id, e)} className="bg-red-900/40 p-2 rounded-lg hover:bg-red-600"><Trash2 size={14}/></button>}
+                      {isUserAdmin && <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Borrar?')) deleteDoc(doc(db, 'spots', spot.id)) }} className="bg-red-900/40 p-2 rounded-lg hover:bg-red-600"><Trash2 size={14}/></button>}
                     </div>
                   </div>
                   <p className="text-zinc-500 text-[10px] font-black uppercase flex items-center gap-2"><MapPin size={12} className="text-red-600" /> {spot.city}</p>
@@ -438,49 +461,31 @@ export default function App() {
         )}
       </main>
 
-      {/* MODAL DETALLE SPOT */}
+      {}
       {selectedSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
           <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            <button 
-              onClick={() => setSelectedSpot(null)} 
-              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
-            >
-              <X size={24} className="text-white" />
-            </button>
+            <button onClick={() => setSelectedSpot(null)} className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"><X size={24} className="text-white" /></button>
             <div className="flex flex-col lg:flex-row h-full">
-              <div className="lg:w-3/5 h-[350px] lg:h-auto">
-                <ImageCarousel images={selectedSpot.images} />
-              </div>
+              <div className="lg:w-3/5 h-[350px] lg:h-auto"><ImageCarousel images={selectedSpot.images} /></div>
               <div className="lg:w-2/5 p-8 lg:p-10 space-y-8">
                 <div className="space-y-2">
                   <span className="bg-red-600 text-[9px] font-black px-3 py-1 rounded-md uppercase tracking-tighter">{selectedSpot.type}</span>
                   <h3 className="text-3xl lg:text-4xl font-black italic uppercase leading-none">{selectedSpot.title}</h3>
                   <p className="text-zinc-500 text-xs font-black uppercase flex items-center gap-2"><MapPin size={14} className="text-red-600" /> {selectedSpot.city}</p>
                 </div>
-                <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
-                  <p className="text-zinc-400 italic text-sm leading-relaxed">"{selectedSpot.description || 'Sin descripción adicional.'}"</p>
-                </div>
-                <div className="space-y-4">
-                   <Button onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${selectedSpot.lat},${selectedSpot.lng}`, '_blank')} className="w-full py-4 text-xs">ABRIR EN GOOGLE MAPS</Button>
-                   <p className="text-[9px] text-zinc-600 font-bold text-center uppercase">Colaborador: {selectedSpot.creatorName}</p>
-                </div>
+                <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800"><p className="text-zinc-400 italic text-sm leading-relaxed">"{selectedSpot.description || 'Sin descripción.'}"</p></div>
+                <Button onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${selectedSpot.lat},${selectedSpot.lng}`, '_blank')} className="w-full py-4 text-xs">ABRIR EN GOOGLE MAPS</Button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DETALLE RIDER */}
       {selectedRider && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
           <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl relative text-center">
-            <button 
-              onClick={() => setSelectedRider(null)} 
-              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
-            >
-              <X size={24} className="text-white" />
-            </button>
+            <button onClick={() => setSelectedRider(null)} className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"><X size={24} className="text-white" /></button>
             <div className="w-32 h-32 mx-auto bg-zinc-900 border-2 border-red-600 rounded-[2rem] flex items-center justify-center overflow-hidden mb-6">
                {selectedRider.photoUrl ? <img src={selectedRider.photoUrl} className="w-full h-full object-cover" /> : <User size={48} className="text-red-600" />}
             </div>
@@ -488,137 +493,113 @@ export default function App() {
               <h3 className="text-3xl lg:text-4xl font-black italic uppercase leading-none">{selectedRider.name}</h3>
               <p className="text-red-600 text-xs font-black uppercase tracking-widest">{selectedRider.city}</p>
             </div>
-            <p className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-zinc-400 italic text-sm mb-8 leading-relaxed">
-              "{selectedRider.bio || 'Este rider todavía no escribió su bio...'}"
-            </p>
+            <p className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-zinc-400 italic text-sm mb-8 leading-relaxed">"{selectedRider.bio || 'Este rider todavía no escribió su bio.'}"</p>
             <div className="flex gap-4">
-              {selectedRider.instagram && (
-                <Button variant="secondary" onClick={() => window.open(`https://instagram.com/${selectedRider.instagram}`)} className="flex-1 py-4">
-                  <InstagramIcon size={20} /> Instagram
-                </Button>
-              )}
-              {selectedRider.whatsapp && (
-                <Button variant="secondary" onClick={() => window.open(`https://wa.me/${selectedRider.whatsapp}`)} className="flex-1 py-4">
-                  <WhatsAppIcon size={20} /> WhatsApp
-                </Button>
-              )}
+              {selectedRider.instagram && <Button variant="secondary" onClick={() => window.open(`https://instagram.com/${selectedRider.instagram}`)} className="flex-1 py-4"><InstagramIcon size={20} /> Instagram</Button>}
+              {selectedRider.whatsapp && <Button variant="secondary" onClick={() => window.open(`https://wa.me/${selectedRider.whatsapp}`)} className="flex-1 py-4"><WhatsAppIcon size={20} /> WhatsApp</Button>}
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL AGREGAR VIDEO */}
-      {isAddingVideo && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
-          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
-            <button 
-              onClick={() => setIsAddingVideo(false)} 
-              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
-            >
-              <X size={24} className="text-white" />
-            </button>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black italic uppercase text-white">Subir <span className="text-red-600">Video</span></h3>
-            </div>
-            <form onSubmit={handleAddVideo} className="space-y-4">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Título" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Link YouTube" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
-              <Button type="submit" className="w-full py-4" isLoading={isLoading}>PUBLICAR</Button>
+      {}
+      {isAddingSpot && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
+          <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
+            <button onClick={() => setIsAddingSpot(false)} className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full border border-white/20"><X size={24} className="text-white" /></button>
+            <h3 className="text-3xl font-black italic uppercase text-white mb-6">Nuevo <span className="text-red-600">Spot</span></h3>
+            <form onSubmit={handleAddSpot} className="space-y-5">
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <select className="bg-zinc-900 p-4 rounded-xl text-white border border-zinc-800" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                <select className="bg-zinc-900 p-4 rounded-xl text-white border border-zinc-800" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{["Skatepark", "Baranda", "Borde", "Escaleras", "Piso Liso"].map(t => <option key={t} value={t}>{t}</option>)}</select>
+              </div>
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 h-24 text-xs" placeholder="Detalles..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
+              
+              <div className="bg-zinc-900/50 p-4 rounded-2xl space-y-3 border border-zinc-800">
+                <div className="flex gap-2">
+                  <input className="flex-1 bg-black border border-zinc-800 p-3 rounded-xl text-xs outline-none" placeholder="Buscar dirección..." value={searchAddress} onChange={e => setSearchAddress(e.target.value)} />
+                  <button type="button" onClick={handleSearchAddress} className="bg-red-600 p-3 rounded-xl"><Search size={16}/></button>
+                </div>
+                <div ref={mapContainerRef} className="h-[200px] rounded-xl overflow-hidden border border-zinc-800" />
+                <button type="button" onClick={handleGetCurrentLocation} className="w-full py-3 bg-zinc-800 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"><Zap size={14} className="text-red-600" /> Mi GPS</button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Fotos (Captura desde cámara)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {newSpot.images.map((img, i) => (
+                    <div key={i} className="relative group/img">
+                      {img ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden">
+                          <img src={img} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => { const ims = [...newSpot.images]; ims[i] = ''; setNewSpot({...newSpot, images: ims})}} className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"><X size={16}/></button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center h-20 bg-zinc-900 border-2 border-dashed border-zinc-800 rounded-lg cursor-pointer hover:border-red-600 transition-all">
+                          <Camera size={20} className="text-zinc-600" />
+                          <span className="text-[8px] font-black uppercase text-zinc-600 mt-1">Foto {i+1}</span>
+                          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleImageUpload(e, i, true)} />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Button type="submit" className="w-full py-5 text-sm" isLoading={isLoading}>PUBLICAR SPOT</Button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL PERFIL */}
       {isEditingProfile && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
           <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button 
-              onClick={() => setIsEditingProfile(false)} 
-              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
-            >
-              <X size={24} className="text-white" />
-            </button>
-            <div className="flex justify-between items-center mb-8">
-               <h3 className="text-3xl lg:text-4xl font-black italic uppercase">Mi <span className="text-red-600">Perfil</span></h3>
-            </div>
+            <button onClick={() => setIsEditingProfile(false)} className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full border border-white/20"><X size={24} className="text-white" /></button>
+            <h3 className="text-3xl font-black italic uppercase mb-8">Mi <span className="text-red-600">Perfil</span></h3>
             <form onSubmit={handleSaveProfile} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Nombre / Alias</label>
-                <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800" placeholder="Alias" value={editProfile.name} onChange={e => setEditProfile({...editProfile, name: e.target.value})} />
-                <select className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800" value={editProfile.city} onChange={e => setEditProfile({...editProfile, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
+              <div className="flex flex-col items-center mb-6">
+                <label className="relative cursor-pointer group/avatar">
+                  <div className="w-32 h-32 rounded-[2rem] bg-zinc-900 border-2 border-red-600 flex items-center justify-center overflow-hidden">
+                    {editProfile.photoUrl ? <img src={editProfile.photoUrl} className="w-full h-full object-cover" /> : <User size={48} className="text-red-600" />}
+                  </div>
+                  <div className="absolute inset-0 bg-red-600/60 rounded-[2rem] flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                    <Camera size={24} className="text-white" />
+                  </div>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleImageUpload(e, 0, false)} />
+                </label>
+                <span className="text-[9px] font-black uppercase text-zinc-500 mt-3 tracking-widest">Toca para cambiar foto</span>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Foto (Link de Drive/Web)</label>
-                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="Pega el link aquí" value={editProfile.photoUrl} onChange={e => setEditProfile({...editProfile, photoUrl: e.target.value})} />
-              </div>
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800" placeholder="Alias" value={editProfile.name} onChange={e => setEditProfile({...editProfile, name: e.target.value})} />
+              <select className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800" value={editProfile.city} onChange={e => setEditProfile({...editProfile, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase text-zinc-500">Instagram</label>
-                   <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="@rider" value={editProfile.instagram} onChange={e => setEditProfile({...editProfile, instagram: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase text-zinc-500">WhatsApp</label>
-                   <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="Número" value={editProfile.whatsapp} onChange={e => setEditProfile({...editProfile, whatsapp: e.target.value})} />
-                </div>
+                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="@rider" value={editProfile.instagram} onChange={e => setEditProfile({...editProfile, instagram: e.target.value})} />
+                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="WhatsApp" value={editProfile.whatsapp} onChange={e => setEditProfile({...editProfile, whatsapp: e.target.value})} />
               </div>
               <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 h-24 text-xs" placeholder="Bio..." value={editProfile.bio} onChange={e => setEditProfile({...editProfile, bio: e.target.value})} />
               {user.email === ROOT_ADMIN && (
                 <div className="p-4 bg-red-950/20 border border-red-900 rounded-2xl space-y-4">
-                  <p className="text-[10px] font-black uppercase text-red-600">Configuración Root</p>
-                  <input className="w-full bg-black p-3 rounded-lg text-xs" placeholder="Admins (separados por coma)" value={adminEmailsInput} onChange={e => setAdminEmailsInput(e.target.value)} />
-                  <input className="w-full bg-black p-3 rounded-lg text-xs" placeholder="URL Logo Principal" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} />
+                  <p className="text-[10px] font-black uppercase text-red-600">Admin Panel</p>
+                  <input className="w-full bg-black p-3 rounded-lg text-xs" placeholder="Admins (comma sep)" value={adminEmailsInput} onChange={e => setAdminEmailsInput(e.target.value)} />
+                  <input className="w-full bg-black p-3 rounded-lg text-xs" placeholder="Logo URL" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} />
                 </div>
               )}
-              <Button type="submit" className="w-full py-5">GUARDAR</Button>
+              <Button type="submit" className="w-full py-5" isLoading={isLoading}>GUARDAR</Button>
               <button type="button" onClick={() => signOut(auth)} className="w-full text-zinc-500 hover:text-red-600 text-[10px] font-black uppercase py-4">Cerrar Sesión</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL AGREGAR SPOT */}
-      {isAddingSpot && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
-          <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button 
-              onClick={() => setIsAddingSpot(false)} 
-              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
-            >
-              <X size={24} className="text-white" />
-            </button>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-3xl font-black italic uppercase text-white">Nuevo <span className="text-red-600">Spot</span></h3>
-            </div>
-            <form onSubmit={handleAddSpot} className="space-y-5">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800 focus:border-red-600" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{["Skatepark", "Baranda", "Borde", "Escaleras", "Piso Liso"].map(t => <option key={t} value={t}>{t}</option>)}</select>
-              </div>
-              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 h-24 text-xs" placeholder="Seguridad, piso, etc..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
-              
-              <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 space-y-3">
-                <div className="flex gap-2">
-                  <input className="flex-1 bg-black border border-zinc-800 p-3 rounded-xl text-xs outline-none focus:border-red-600" placeholder="Buscar dirección..." value={searchAddress} onChange={e => setSearchAddress(e.target.value)} />
-                  <button type="button" onClick={handleSearchAddress} className="bg-red-600 p-3 rounded-xl hover:bg-red-500"><Search size={16}/></button>
-                </div>
-                {searchStatus && <p className="text-[9px] font-bold uppercase text-center text-red-600">{searchStatus}</p>}
-                <div ref={mapContainerRef} className="h-[200px] rounded-xl overflow-hidden border border-zinc-800" />
-                <button type="button" onClick={handleGetCurrentLocation} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"><Zap size={14} className="text-red-600" /> Mi GPS</button>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Fotos (4 Links)</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {newSpot.images.map((img, i) => (
-                    <input key={i} className="w-full bg-zinc-900 p-3 rounded-lg text-xs outline-none border border-zinc-800" placeholder={`Link ${i+1}`} value={img} onChange={e => {
-                      const ims = [...newSpot.images]; ims[i] = e.target.value; setNewSpot({...newSpot, images: ims});
-                    }} />
-                  ))}
-                </div>
-              </div>
-              <Button type="submit" className="w-full py-5 text-sm" isLoading={isLoading}>PUBLICAR SPOT</Button>
+      {isAddingVideo && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
+            <button onClick={() => setIsAddingVideo(false)} className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full border border-white/20"><X size={24} className="text-white" /></button>
+            <h3 className="text-2xl font-black italic uppercase text-white mb-6">Subir <span className="text-red-600">Video</span></h3>
+            <form onSubmit={handleAddVideo} className="space-y-4">
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Título" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Link YouTube" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
+              <Button type="submit" className="w-full py-4" isLoading={isLoading}>PUBLICAR</Button>
             </form>
           </div>
         </div>
