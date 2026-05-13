@@ -95,8 +95,6 @@ export default function App() {
 
   const [newSpot, setNewSpot] = useState({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
   const [newVideo, setNewVideo] = useState({ title: '', youtubeUrl: '' });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchStatus, setSearchStatus] = useState('');
   const [editProfile, setEditProfile] = useState({ name: '', city: 'Neuquén Capital', instagram: '', whatsapp: '', bio: '' });
   const [adminEmailsInput, setAdminEmailsInput] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
@@ -198,16 +196,12 @@ export default function App() {
   const handleAddVideo = async (e) => {
     e.preventDefault();
     setLoginError(null);
-    
-    const videoId = extractVideoId(newVideo.youtubeUrl);
-    
-    if (!videoId) {
-      setLoginError("URL de YouTube inválida. Copiá el link directo del video.");
-      return;
-    }
-
     setIsLoading(true);
+    
     try {
+      const videoId = extractVideoId(newVideo.youtubeUrl);
+      if (!videoId) throw new Error("URL de YouTube inválida");
+
       await addDoc(collection(db, 'videos'), {
         ...newVideo,
         videoId,
@@ -215,10 +209,12 @@ export default function App() {
         creatorName: userProfile?.name || 'Rider',
         createdAt: new Date().toISOString()
       });
-      setIsAddingVideo(false);
+      
+      // Cleanup and CLOSE
       setNewVideo({ title: '', youtubeUrl: '' });
+      setIsAddingVideo(false);
     } catch (error) {
-      setLoginError("Error al subir: " + error.message);
+      setLoginError(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -226,7 +222,7 @@ export default function App() {
 
   const handleAddSpot = async (e) => {
     e.preventDefault();
-    if (!newSpot.lat || !newSpot.lng) return setSearchStatus('⚠️ Buscá una ubicación');
+    if (!newSpot.lat || !newSpot.lng) return setLoginError('⚠️ Buscá una ubicación en el mapa');
     setIsLoading(true);
     try {
       const validImages = newSpot.images.filter(url => url.trim() !== '');
@@ -318,6 +314,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Dynamic sections rendering... */}
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
@@ -371,7 +368,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Modals */}
+      {}
       {isAddingVideo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl">
@@ -382,7 +379,10 @@ export default function App() {
             <form onSubmit={handleAddVideo} className="space-y-4">
               <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Título del Video" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
               <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Link de YouTube (ej: https://youtu.be/...)" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
-              <Button type="submit" className="w-full py-4" isLoading={isLoading}>PUBLICAR VIDEO</Button>
+              <div className="flex gap-4">
+                <Button type="submit" className="flex-1 py-4" isLoading={isLoading}>PUBLICAR VIDEO</Button>
+                <Button type="button" variant="secondary" onClick={() => setIsAddingVideo(false)} className="px-6">CANCELAR</Button>
+              </div>
             </form>
           </div>
         </div>
@@ -432,11 +432,18 @@ export default function App() {
                 <select className="bg-zinc-900 p-4 rounded-xl" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
               </div>
               <div ref={mapContainerRef} className="h-64 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900" />
-              <Button type="submit" className="w-full py-5" isLoading={isLoading}>PUBLICAR SPOT</Button>
+              <Button type="submit" className="w-full py-5" isLoading={isLoading}>PUBLICA SPOT</Button>
             </form>
           </div>
         </div>
       )}
+
+      {/* Mobile Nav Bar */}
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-40 bg-zinc-950/80 backdrop-blur-xl p-3 rounded-3xl border border-zinc-800 shadow-2xl">
+         <button onClick={() => setActiveTab('explore')} className={`p-4 rounded-2xl transition-all ${activeTab === 'explore' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><MapPin size={24}/></button>
+         <button onClick={() => setActiveTab('riders')} className={`p-4 rounded-2xl transition-all ${activeTab === 'riders' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><Users size={24}/></button>
+         <button onClick={() => setActiveTab('media')} className={`p-4 rounded-2xl transition-all ${activeTab === 'media' ? 'bg-red-600 text-white scale-110' : 'text-zinc-500'}`}><PlayCircle size={24}/></button>
+      </div>
     </div>
   );
 }
