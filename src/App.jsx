@@ -197,11 +197,11 @@ export default function App() {
     e.preventDefault();
     setLoginError(null);
     setIsLoading(true);
-    
     try {
       const videoId = extractVideoId(newVideo.youtubeUrl);
       if (!videoId) throw new Error("URL de YouTube inválida");
 
+      // GUARDAR EN FIREBASE (Para que todos lo vean y persista)
       await addDoc(collection(db, 'videos'), {
         ...newVideo,
         videoId,
@@ -210,7 +210,7 @@ export default function App() {
         createdAt: new Date().toISOString()
       });
       
-      // Cleanup and CLOSE
+      // LIMPIAR Y CERRAR AL INSTANTE
       setNewVideo({ title: '', youtubeUrl: '' });
       setIsAddingVideo(false);
     } catch (error) {
@@ -420,19 +420,63 @@ export default function App() {
 
       {isAddingSpot && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
-          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-4xl font-black italic uppercase">Nuevo <span className="text-red-600">Spot</span></h3>
-              <button onClick={() => setIsAddingSpot(false)}><X/></button>
+          <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2.5rem] w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-3xl font-black italic uppercase text-white">Nuevo <span className="text-red-600">Spot</span></h3>
+              <button onClick={() => setIsAddingSpot(false)} className="text-zinc-500 hover:text-white"><X size={24}/></button>
             </div>
-            <form onSubmit={handleAddSpot} className="space-y-6">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
+            <form onSubmit={handleAddSpot} className="space-y-5">
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-transparent focus:border-red-600 text-white" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
+              
               <div className="grid grid-cols-2 gap-4">
-                <select className="bg-zinc-900 p-4 rounded-xl" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                <select className="bg-zinc-900 p-4 rounded-xl" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>
+                  {CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>
+                  {SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
-              <div ref={mapContainerRef} className="h-64 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900" />
-              <Button type="submit" className="w-full py-5" isLoading={isLoading}>PUBLICA SPOT</Button>
+
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none h-24 text-sm text-white border border-zinc-800" placeholder="Detalles de seguridad..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
+
+              {}
+              <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 space-y-3">
+                <p className="text-[10px] font-black uppercase text-red-600 tracking-widest flex items-center gap-2">
+                  <MapPin size={12}/> Ubicación
+                </p>
+                <div className="flex gap-2">
+                  <input 
+                    className="flex-1 bg-black border border-zinc-800 p-3 rounded-xl text-xs outline-none focus:border-red-600 text-white" 
+                    placeholder="Buscar dirección o lugar..."
+                    value={searchAddress}
+                    onChange={(e) => setSearchAddress(e.target.value)}
+                  />
+                  <button type="button" onClick={handleSearchAddress} className="bg-red-600 p-3 rounded-xl hover:bg-red-500 transition-colors">
+                    <Search size={16}/>
+                  </button>
+                </div>
+                {searchStatus && <p className="text-[9px] font-bold uppercase text-center text-red-600 animate-pulse">{searchStatus}</p>}
+                
+                <div id="map-container" className="h-[200px] rounded-xl overflow-hidden border border-zinc-800" />
+                
+                <button type="button" onClick={handleGetCurrentLocation} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all">
+                  <Zap size={14} className="text-red-600" /> Usar mi GPS actual
+                </button>
+              </div>
+
+              {}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Imágenes (Links de Drive/Web)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {newSpot.images.map((img, i) => (
+                    <input key={i} className="w-full bg-zinc-900 p-3 rounded-lg text-xs outline-none focus:border-red-600 text-white border border-zinc-800" placeholder={`Link Imagen ${i+1}`} value={img} onChange={e => {
+                      const ims = [...newSpot.images]; ims[i] = e.target.value; setNewSpot({...newSpot, images: ims});
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full py-5 text-sm" isLoading={isLoading}>PUBLICA SPOT</Button>
             </form>
           </div>
         </div>
