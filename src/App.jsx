@@ -67,22 +67,22 @@ const Button = ({ children, variant = 'primary', isLoading = false, className = 
 const ImageCarousel = ({ images }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   if (!images || images.length === 0) return (
-    <div className="w-full h-64 flex flex-col items-center justify-center opacity-20 bg-zinc-900">
+    <div className="w-full h-full min-h-[250px] flex flex-col items-center justify-center opacity-20 bg-zinc-900">
       <ImageIcon size={48} />
       <span className="text-[10px] font-black uppercase mt-2">Sin Imágenes</span>
     </div>
   );
 
   return (
-    <div className="relative w-full h-full group/carousel overflow-hidden bg-black">
+    <div className="relative w-full h-full min-h-[250px] group/carousel overflow-hidden bg-black rounded-t-2xl">
       <img src={images[currentIndex]} className="w-full h-full object-cover" alt="Spot" />
       {images.length > 1 && (
         <>
-          <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => (prev - 1 + images.length) % images.length)}} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full hover:bg-red-600 transition-colors z-10">
-            <ChevronLeft size={16} />
+          <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => (prev - 1 + images.length) % images.length)}} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 p-3 rounded-full hover:bg-red-600 transition-colors z-10">
+            <ChevronLeft size={20} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => (prev + 1) % images.length)}} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full hover:bg-red-600 transition-colors z-10">
-            <ChevronRight size={16} />
+          <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => (prev + 1) % images.length)}} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 p-3 rounded-full hover:bg-red-600 transition-colors z-10">
+            <ChevronRight size={20} />
           </button>
           <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-10">
             {images.map((_, i) => (
@@ -104,7 +104,7 @@ export default function App() {
   const [videos, setVideos] = useState([]);
   const [appSettings, setAppSettings] = useState({ logoUrl: '', adminList: '' });
   
-  // Modales
+  // Modals
   const [isAddingSpot, setIsAddingSpot] = useState(false);
   const [isAddingVideo, setIsAddingVideo] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -113,7 +113,6 @@ export default function App() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [cityFilter, setCityFilter] = useState('All');
-  const [loginError, setLoginError] = useState(null);
 
   const [newSpot, setNewSpot] = useState({ title: '', city: 'Neuquén Capital', type: 'Skatepark', description: '', images: ['', '', '', ''], lat: '', lng: '' });
   const [newVideo, setNewVideo] = useState({ title: '', youtubeUrl: '' });
@@ -315,10 +314,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-20 font-sans">
+    <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-24 font-sans">
       
-      {/* Navegación */}
-      <nav className="sticky top-0 z-50 bg-black/95 border-b border-zinc-900 px-6 py-4 backdrop-blur-md">
+      {/* Navegación Desktop */}
+      <nav className="sticky top-0 z-[100] bg-black/95 border-b border-zinc-900 px-6 py-4 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('explore')}>
             {appSettings.logoUrl ? <img src={appSettings.logoUrl} className="h-10 rounded-lg" alt="Logo" /> : <div className="bg-red-600 p-2 rounded-xl"><Navigation size={22} /></div>}
@@ -326,13 +325,13 @@ export default function App() {
           </div>
           
           <div className="hidden md:flex gap-8">
-            {['explore', 'riders', 'media'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-red-600 border-b-2 border-red-600 pb-1' : 'text-zinc-500 hover:text-white'}`}>{tab === 'explore' ? 'Spots' : tab === 'media' ? 'Media' : 'Riders'}</button>
+            {['explore', 'riders', 'videos'].map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-red-600 border-b-2 border-red-600 pb-1' : 'text-zinc-500 hover:text-white'}`}>{tab === 'explore' ? 'Spots' : tab === 'videos' ? 'Videos' : 'Riders'}</button>
             ))}
           </div>
 
           {!user ? (
-            <Button onClick={() => signInWithPopup(auth, provider)}>Login Google</Button>
+            <Button onClick={() => signInWithPopup(auth, provider)} className="text-[10px] py-2">Login</Button>
           ) : (
             <button onClick={() => setIsEditingProfile(true)} className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
@@ -347,11 +346,27 @@ export default function App() {
         </div>
       </nav>
 
+      {/* Navegación Mobile (Sticky Bottom) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[150] bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800 px-6 py-4 flex justify-around items-center">
+        <button onClick={() => setActiveTab('explore')} className={`flex flex-col items-center gap-1 ${activeTab === 'explore' ? 'text-red-600' : 'text-zinc-500'}`}>
+          <MapPin size={24} />
+          <span className="text-[10px] font-black uppercase">Spots</span>
+        </button>
+        <button onClick={() => setActiveTab('riders')} className={`flex flex-col items-center gap-1 ${activeTab === 'riders' ? 'text-red-600' : 'text-zinc-500'}`}>
+          <Users size={24} />
+          <span className="text-[10px] font-black uppercase">Riders</span>
+        </button>
+        <button onClick={() => setActiveTab('videos')} className={`flex flex-col items-center gap-1 ${activeTab === 'videos' ? 'text-red-600' : 'text-zinc-500'}`}>
+          <Video size={24} />
+          <span className="text-[10px] font-black uppercase">Videos</span>
+        </button>
+      </div>
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
-            <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : 'Media'}</h2>
+            <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : 'Videos'}</h2>
             <p className="text-zinc-500 text-xs font-black flex items-center gap-2 uppercase tracking-widest"><Globe size={14} className="text-red-600" /> Argentina / {cityFilter}</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
@@ -360,7 +375,7 @@ export default function App() {
               {CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             {user && activeTab === 'explore' && <Button onClick={() => setIsAddingSpot(true)}><Plus size={20}/> SUMAR SPOT</Button>}
-            {user && activeTab === 'media' && <Button onClick={() => setIsAddingVideo(true)}><Video size={20}/> SUBIR VIDEO</Button>}
+            {user && activeTab === 'videos' && <Button onClick={() => setIsAddingVideo(true)}><Video size={20}/> SUBIR VIDEO</Button>}
           </div>
         </div>
 
@@ -368,11 +383,7 @@ export default function App() {
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
-              <div 
-                key={spot.id} 
-                onClick={() => setSelectedSpot(spot)}
-                className="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden group hover:border-red-600 transition-all cursor-pointer"
-              >
+              <div key={spot.id} onClick={() => setSelectedSpot(spot)} className="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden group hover:border-red-600 transition-all cursor-pointer">
                 <div className="h-56">
                   <ImageCarousel images={spot.images} />
                 </div>
@@ -396,11 +407,7 @@ export default function App() {
         {activeTab === 'riders' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {riders.filter(r => cityFilter === 'All' || r.city === cityFilter).map(rider => (
-              <div 
-                key={rider.uid} 
-                onClick={() => setSelectedRider(rider)}
-                className="bg-zinc-950 border border-zinc-900 p-8 rounded-2xl text-center space-y-4 hover:border-red-600 transition-all group cursor-pointer"
-              >
+              <div key={rider.uid} onClick={() => setSelectedRider(rider)} className="bg-zinc-950 border border-zinc-900 p-8 rounded-2xl text-center space-y-4 hover:border-red-600 transition-all group cursor-pointer">
                 <div className="w-24 h-24 mx-auto bg-zinc-900 border-2 border-red-600 rounded-3xl flex items-center justify-center overflow-hidden">
                    {rider.photoUrl ? <img src={rider.photoUrl} className="w-full h-full object-cover" /> : <User size={40} className="text-red-600" />}
                 </div>
@@ -413,7 +420,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'media' && (
+        {activeTab === 'videos' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {videos.map(vid => (
                <div key={vid.id} className="bg-zinc-950 border border-zinc-900 rounded-3xl overflow-hidden relative group">
@@ -434,18 +441,18 @@ export default function App() {
       {/* MODAL DETALLE SPOT */}
       {selectedSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            <button onClick={() => setSelectedSpot(null)} className="absolute top-6 right-6 z-50 bg-black/60 p-3 rounded-full hover:bg-red-600 transition-colors">
-              <X size={24} />
+          <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+            <button onClick={() => setSelectedSpot(null)} className="fixed top-6 right-6 z-[210] bg-black/80 p-4 rounded-full hover:bg-red-600 transition-colors border border-zinc-700">
+              <X size={28} />
             </button>
             <div className="flex flex-col lg:flex-row h-full">
-              <div className="lg:w-3/5 h-[400px] lg:h-auto">
+              <div className="lg:w-3/5 h-[350px] lg:h-auto">
                 <ImageCarousel images={selectedSpot.images} />
               </div>
-              <div className="lg:w-2/5 p-10 space-y-8">
+              <div className="lg:w-2/5 p-8 lg:p-10 space-y-8">
                 <div className="space-y-2">
                   <span className="bg-red-600 text-[9px] font-black px-3 py-1 rounded-md uppercase tracking-tighter">{selectedSpot.type}</span>
-                  <h3 className="text-4xl font-black italic uppercase leading-none">{selectedSpot.title}</h3>
+                  <h3 className="text-3xl lg:text-4xl font-black italic uppercase leading-none">{selectedSpot.title}</h3>
                   <p className="text-zinc-500 text-xs font-black uppercase flex items-center gap-2"><MapPin size={14} className="text-red-600" /> {selectedSpot.city}</p>
                 </div>
                 <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
@@ -464,15 +471,15 @@ export default function App() {
       {/* MODAL DETALLE RIDER */}
       {selectedRider && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
-          <div className="bg-zinc-950 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-lg shadow-2xl relative text-center">
-            <button onClick={() => setSelectedRider(null)} className="absolute top-6 right-6 bg-zinc-900 p-2 rounded-full hover:bg-red-600 transition-colors">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl relative text-center">
+            <button onClick={() => setSelectedRider(null)} className="absolute top-4 right-4 bg-zinc-900 p-3 rounded-full hover:bg-red-600 transition-colors border border-zinc-700">
               <X size={20} />
             </button>
             <div className="w-32 h-32 mx-auto bg-zinc-900 border-2 border-red-600 rounded-[2rem] flex items-center justify-center overflow-hidden mb-6">
                {selectedRider.photoUrl ? <img src={selectedRider.photoUrl} className="w-full h-full object-cover" /> : <User size={48} className="text-red-600" />}
             </div>
             <div className="space-y-2 mb-8">
-              <h3 className="text-4xl font-black italic uppercase leading-none">{selectedRider.name}</h3>
+              <h3 className="text-3xl lg:text-4xl font-black italic uppercase leading-none">{selectedRider.name}</h3>
               <p className="text-red-600 text-xs font-black uppercase tracking-widest">{selectedRider.city}</p>
             </div>
             <p className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 text-zinc-400 italic text-sm mb-8 leading-relaxed">
@@ -496,15 +503,15 @@ export default function App() {
 
       {/* MODAL AGREGAR VIDEO */}
       {isAddingVideo && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
-            <button onClick={() => setIsAddingVideo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X/></button>
+            <button onClick={() => setIsAddingVideo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"><X/></button>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black italic uppercase">Subir <span className="text-red-600">Video</span></h3>
+              <h3 className="text-2xl font-black italic uppercase text-white">Subir <span className="text-red-600">Video</span></h3>
             </div>
             <form onSubmit={handleAddVideo} className="space-y-4">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Título" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Link YouTube" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Título" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Link YouTube" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
               <Button type="submit" className="w-full py-4" isLoading={isLoading}>PUBLICAR</Button>
             </form>
           </div>
@@ -513,33 +520,33 @@ export default function App() {
 
       {/* MODAL PERFIL */}
       {isEditingProfile && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
-          <div className="bg-zinc-950 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsEditingProfile(false)} className="absolute top-6 right-6 text-zinc-500 hover:text-white"><X/></button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
+            <button onClick={() => setIsEditingProfile(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"><X/></button>
             <div className="flex justify-between items-center mb-8">
-               <h3 className="text-4xl font-black italic uppercase">Mi <span className="text-red-600">Perfil</span></h3>
+               <h3 className="text-3xl lg:text-4xl font-black italic uppercase">Mi <span className="text-red-600">Perfil</span></h3>
             </div>
             <form onSubmit={handleSaveProfile} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Info Básica</label>
-                <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none" placeholder="Nombre / Alias" value={editProfile.name} onChange={e => setEditProfile({...editProfile, name: e.target.value})} />
-                <select className="w-full bg-zinc-900 p-4 rounded-xl outline-none" value={editProfile.city} onChange={e => setEditProfile({...editProfile, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                <label className="text-[10px] font-black uppercase text-zinc-500">Nombre / Alias</label>
+                <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800" placeholder="Alias" value={editProfile.name} onChange={e => setEditProfile({...editProfile, name: e.target.value})} />
+                <select className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800" value={editProfile.city} onChange={e => setEditProfile({...editProfile, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Foto de Perfil (Link de Drive/Web)</label>
-                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-xs" placeholder="Pega el link de tu imagen aquí" value={editProfile.photoUrl} onChange={e => setEditProfile({...editProfile, photoUrl: e.target.value})} />
+                <label className="text-[10px] font-black uppercase text-zinc-500">Foto (Link de Drive/Web)</label>
+                <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="Pega el link aquí" value={editProfile.photoUrl} onChange={e => setEditProfile({...editProfile, photoUrl: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                    <label className="text-[10px] font-black uppercase text-zinc-500">Instagram</label>
-                   <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-xs" placeholder="@rider" value={editProfile.instagram} onChange={e => setEditProfile({...editProfile, instagram: e.target.value})} />
+                   <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="@rider" value={editProfile.instagram} onChange={e => setEditProfile({...editProfile, instagram: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                    <label className="text-[10px] font-black uppercase text-zinc-500">WhatsApp</label>
-                   <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-xs" placeholder="Número" value={editProfile.whatsapp} onChange={e => setEditProfile({...editProfile, whatsapp: e.target.value})} />
+                   <input className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 text-xs" placeholder="Número" value={editProfile.whatsapp} onChange={e => setEditProfile({...editProfile, whatsapp: e.target.value})} />
                 </div>
               </div>
-              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none h-24 text-xs" placeholder="Bio: contanos un poco de vos..." value={editProfile.bio} onChange={e => setEditProfile({...editProfile, bio: e.target.value})} />
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 h-24 text-xs" placeholder="Bio..." value={editProfile.bio} onChange={e => setEditProfile({...editProfile, bio: e.target.value})} />
               {user.email === ROOT_ADMIN && (
                 <div className="p-4 bg-red-950/20 border border-red-900 rounded-2xl space-y-4">
                   <p className="text-[10px] font-black uppercase text-red-600">Configuración Root</p>
@@ -547,7 +554,7 @@ export default function App() {
                   <input className="w-full bg-black p-3 rounded-lg text-xs" placeholder="URL Logo Principal" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} />
                 </div>
               )}
-              <Button type="submit" className="w-full py-5">GUARDAR PERFIL</Button>
+              <Button type="submit" className="w-full py-5">GUARDAR</Button>
               <button type="button" onClick={() => signOut(auth)} className="w-full text-zinc-500 hover:text-red-600 text-[10px] font-black uppercase py-4">Cerrar Sesión</button>
             </form>
           </div>
@@ -556,19 +563,20 @@ export default function App() {
 
       {/* MODAL AGREGAR SPOT */}
       {isAddingSpot && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
-          <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2.5rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsAddingSpot(false)} className="absolute top-6 right-6 text-zinc-500 hover:text-white"><X/></button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
+          <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
+            <button onClick={() => setIsAddingSpot(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"><X/></button>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-3xl font-black italic uppercase text-white">Nuevo <span className="text-red-600">Spot</span></h3>
             </div>
             <form onSubmit={handleAddSpot} className="space-y-5">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-transparent focus:border-red-600" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800 focus:border-red-600" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
               <div className="grid grid-cols-2 gap-4">
-                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{["Skatepark", "Baranda", "Borde", "Escaleras", "Piso Liso"].map(t => <option key={t} value={t}>{t}</option>)}</select>
+                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})}>{CITIES_ARGENTINA.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                <select className="bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" value={newSpot.type} onChange={e => setNewSpot({...newSpot, type: e.target.value})}>{["Skatepark", "Baranda", "Borde", "Escaleras", "Piso Liso"].map(t => <option key={t} value={t}>{t}</option>)}</select>
               </div>
-              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none h-24 text-xs" placeholder="Detalles de seguridad..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl outline-none border border-zinc-800 h-24 text-xs" placeholder="Seguridad, piso, etc..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
+              
               <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 space-y-3">
                 <div className="flex gap-2">
                   <input className="flex-1 bg-black border border-zinc-800 p-3 rounded-xl text-xs outline-none focus:border-red-600" placeholder="Buscar dirección..." value={searchAddress} onChange={e => setSearchAddress(e.target.value)} />
@@ -576,13 +584,14 @@ export default function App() {
                 </div>
                 {searchStatus && <p className="text-[9px] font-bold uppercase text-center text-red-600">{searchStatus}</p>}
                 <div ref={mapContainerRef} className="h-[200px] rounded-xl overflow-hidden border border-zinc-800" />
-                <button type="button" onClick={handleGetCurrentLocation} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"><Zap size={14} className="text-red-600" /> Usar mi GPS</button>
+                <button type="button" onClick={handleGetCurrentLocation} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2"><Zap size={14} className="text-red-600" /> Mi GPS</button>
               </div>
+
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Fotos (4 Links de Drive/Web)</p>
+                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Fotos (4 Links)</p>
                 <div className="grid grid-cols-2 gap-2">
                   {newSpot.images.map((img, i) => (
-                    <input key={i} className="w-full bg-zinc-900 p-3 rounded-lg text-xs outline-none focus:border-red-600" placeholder={`Imagen ${i+1}`} value={img} onChange={e => {
+                    <input key={i} className="w-full bg-zinc-900 p-3 rounded-lg text-xs outline-none border border-zinc-800" placeholder={`Link ${i+1}`} value={img} onChange={e => {
                       const ims = [...newSpot.images]; ims[i] = e.target.value; setNewSpot({...newSpot, images: ims});
                     }} />
                   ))}
