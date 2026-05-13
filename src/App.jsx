@@ -442,8 +442,11 @@ export default function App() {
       {selectedSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
           <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            <button onClick={() => setSelectedSpot(null)} className="fixed top-6 right-6 z-[210] bg-black/80 p-4 rounded-full hover:bg-red-600 transition-colors border border-zinc-700">
-              <X size={28} />
+            <button 
+              onClick={() => setSelectedSpot(null)} 
+              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
+            >
+              <X size={24} className="text-white" />
             </button>
             <div className="flex flex-col lg:flex-row h-full">
               <div className="lg:w-3/5 h-[350px] lg:h-auto">
@@ -472,8 +475,11 @@ export default function App() {
       {selectedRider && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
           <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl relative text-center">
-            <button onClick={() => setSelectedRider(null)} className="absolute top-4 right-4 bg-zinc-900 p-3 rounded-full hover:bg-red-600 transition-colors border border-zinc-700">
-              <X size={20} />
+            <button 
+              onClick={() => setSelectedRider(null)} 
+              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
+            >
+              <X size={24} className="text-white" />
             </button>
             <div className="w-32 h-32 mx-auto bg-zinc-900 border-2 border-red-600 rounded-[2rem] flex items-center justify-center overflow-hidden mb-6">
                {selectedRider.photoUrl ? <img src={selectedRider.photoUrl} className="w-full h-full object-cover" /> : <User size={48} className="text-red-600" />}
@@ -505,7 +511,12 @@ export default function App() {
       {isAddingVideo && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
-            <button onClick={() => setIsAddingVideo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"><X/></button>
+            <button 
+              onClick={() => setIsAddingVideo(false)} 
+              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
+            >
+              <X size={24} className="text-white" />
+            </button>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black italic uppercase text-white">Subir <span className="text-red-600">Video</span></h3>
             </div>
@@ -522,7 +533,12 @@ export default function App() {
       {isEditingProfile && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
           <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsEditingProfile(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"><X/></button>
+            <button 
+              onClick={() => setIsEditingProfile(false)} 
+              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
+            >
+              <X size={24} className="text-white" />
+            </button>
             <div className="flex justify-between items-center mb-8">
                <h3 className="text-3xl lg:text-4xl font-black italic uppercase">Mi <span className="text-red-600">Perfil</span></h3>
             </div>
@@ -565,7 +581,12 @@ export default function App() {
       {isAddingSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
           <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsAddingSpot(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2"><X/></button>
+            <button 
+              onClick={() => setIsAddingSpot(false)} 
+              className="fixed top-6 right-6 z-[210] bg-red-600 p-4 rounded-full shadow-2xl border border-white/20 active:scale-90 transition-all"
+            >
+              <X size={24} className="text-white" />
+            </button>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-3xl font-black italic uppercase text-white">Nuevo <span className="text-red-600">Spot</span></h3>
             </div>
