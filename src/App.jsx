@@ -142,7 +142,7 @@ export default function App() {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 600;
+          const MAX_WIDTH = 600; // Ancho máximo para optimizar espacio en Firestore
           let width = img.width;
           let height = img.height;
 
@@ -155,7 +155,7 @@ export default function App() {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Compresión 60%
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Compresión al 60%
           resolve(dataUrl);
         };
       };
@@ -342,7 +342,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-24 font-sans">
       
-      {/* Navegación Fija Desktop */}
+      {/* Navegación Desktop */}
       <nav className="sticky top-0 z-[100] bg-black/95 border-b border-zinc-900 px-6 py-4 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('explore')}>
@@ -389,6 +389,7 @@ export default function App() {
       </div>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
+        {/* Header Dinámico */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
             <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : 'Videos'}</h2>
@@ -404,7 +405,7 @@ export default function App() {
           </div>
         </div>
 
-        {}
+        {/* Listado de Spots */}
         {activeTab === 'explore' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {spots.filter(s => cityFilter === 'All' || s.city === cityFilter).map(spot => (
@@ -427,6 +428,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Listado de Riders */}
         {activeTab === 'riders' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {riders.filter(r => cityFilter === 'All' || r.city === cityFilter).map(rider => (
@@ -443,6 +445,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Galería de Videos */}
         {activeTab === 'videos' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {videos.map(vid => (
@@ -461,7 +464,7 @@ export default function App() {
         )}
       </main>
 
-      {}
+      {/* MODAL: DETALLE SPOT */}
       {selectedSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
           <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
@@ -482,6 +485,7 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL: DETALLE RIDER */}
       {selectedRider && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-black/90">
           <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl relative text-center">
@@ -502,7 +506,7 @@ export default function App() {
         </div>
       )}
 
-      {}
+      {/* MODAL: CARGAR SPOT */}
       {isAddingSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
           <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
@@ -552,6 +556,7 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL: MI PERFIL */}
       {isEditingProfile && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
           <div className="bg-zinc-950 border border-zinc-800 p-8 lg:p-10 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
@@ -591,6 +596,7 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL: SUBIR VIDEO */}
       {isAddingVideo && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
@@ -599,7 +605,7 @@ export default function App() {
             <form onSubmit={handleAddVideo} className="space-y-4">
               <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Título" value={newVideo.title} onChange={e => setNewVideo({...newVideo, title: e.target.value})} />
               <input required className="w-full bg-zinc-900 p-4 rounded-xl outline-none text-white border border-zinc-800" placeholder="Link YouTube" value={newVideo.youtubeUrl} onChange={e => setNewVideo({...newVideo, youtubeUrl: e.target.value})} />
-              <Button type="submit" className="w-full py-4" isLoading={isLoading}>PUBLICAR</Button>
+              <Button type="submit" className="w-full py-4" isLoading={isLoading}>PUBLICA VIDEO</Button>
             </form>
           </div>
         </div>
