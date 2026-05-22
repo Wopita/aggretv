@@ -68,7 +68,7 @@ const Button = ({ children, variant = 'primary', isLoading = false, className = 
   );
 };
 
-const ImageCarousel = ({ images }) => {
+const ImageCarousel = ({ images, onImageClick }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   if (!images || images.length === 0) return (
     <div className="w-full h-full flex flex-col items-center justify-center opacity-20 bg-zinc-900 min-h-[200px]">
@@ -78,8 +78,13 @@ const ImageCarousel = ({ images }) => {
   );
 
   return (
-    <div className="relative w-full h-64 group/carousel overflow-hidden bg-black">
-      <img src={images[currentIndex]} className="w-full h-full object-cover" alt="Spot View" />
+    <div className="relative w-full h-64 group/carousel overflow-hidden bg-black cursor-zoom-in">
+      <img 
+        src={images[currentIndex]} 
+        className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.03]" 
+        alt="Spot View" 
+        onClick={() => onImageClick && onImageClick(images[currentIndex])}
+      />
       {images.length > 1 && (
         <>
           <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => (prev - 1 + images.length) % images.length)}} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full hover:bg-red-600 z-10">
@@ -110,6 +115,7 @@ export default function App() {
   const [isEditingSpotByAdmin, setIsEditingSpotByAdmin] = useState(false);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [selectedRider, setSelectedRider] = useState(null);
+  const [fullscreenImage, setFullscreenImage] = useState(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [provinceFilter, setProvinceFilter] = useState('All');
@@ -1581,7 +1587,7 @@ export default function App() {
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-2xl relative my-8">
             <button onClick={() => setSelectedSpot(null)} className="absolute top-6 right-6 z-20 bg-red-600 p-4 rounded-full border border-white/20"><X size={24} className="text-white" /></button>
             <div className="rounded-2xl overflow-hidden mb-8 shadow-2xl">
-               <ImageCarousel images={selectedSpot.images} />
+               <ImageCarousel images={selectedSpot.images} onImageClick={(imgUrl) => setFullscreenImage(imgUrl)} />
             </div>
             <div className="space-y-6">
               <div className="flex justify-between items-start">
@@ -1781,6 +1787,28 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Lightbox / Imagen en Pantalla Completa */}
+      {fullscreenImage && (
+        <div 
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 cursor-zoom-out animate-fadeIn"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button 
+            onClick={() => setFullscreenImage(null)} 
+            className="absolute top-6 right-6 z-[310] bg-red-600 p-4 rounded-full border border-white/20 active:scale-95 transition-all cursor-pointer"
+          >
+            <X size={24} className="text-white" />
+          </button>
+          <img 
+            src={fullscreenImage} 
+            className="max-w-full max-h-[90vh] md:max-h-[85vh] object-contain rounded-xl shadow-2xl border border-zinc-800/80" 
+            alt="Spot Full View" 
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>
+      )}
+
     </div>
   );
 }
