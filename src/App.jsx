@@ -377,6 +377,8 @@ export default function App() {
             canvas {
                 image-rendering: pixelated;
                 box-shadow: 0 0 35px rgba(255, 0, 110, 0.5);
+                max-width: 100%;
+                height: auto;
             }
             @keyframes neon-flicker {
                 0%, 100% { text-shadow: 0 0 8px #ff007f, 0 0 15px #ff007f; }
@@ -402,7 +404,7 @@ export default function App() {
             }
         </style>
     </head>
-    <body class="flex flex-col items-center justify-center min-h-screen text-white select-none">
+    <body class="flex flex-col items-center justify-between min-h-screen text-white select-none p-1 sm:p-2">
     
     <script>
       window.__app_id = "aggretv";
@@ -411,7 +413,7 @@ export default function App() {
       window.__initial_rider_name = "${profileNameSanitized}";
     </script>
     
-    <div class="relative w-full max-w-4xl p-2 flex flex-col items-center">
+    <div class="relative w-full max-w-4xl p-1 sm:p-2 flex flex-col items-center">
         <div class="w-full flex justify-between items-center px-4 py-2 bg-purple-950/40 rounded-t-xl border-t-2 border-x-2 border-pink-500/50">
             <div class="flex items-center gap-2">
                 <span class="inline-block w-3 h-3 bg-green-500 rounded-full animate-ping"></span>
@@ -454,7 +456,7 @@ export default function App() {
                         <div id="leaderboardList" class="flex-grow flex flex-col justify-center text-left text-[8px] py-2 space-y-1.5 font-bold">
                             <p class="text-center text-gray-500 animate-pulse">SINTONIZANDO SEÑAL...</p>
                         </div>
-                        <div class="text-[6px] text-gray-500 tracking-wider pt-2 border-t border-purple-950">ACTUALIZADO EN TIEMPO REAL</div>
+                        <div class="text-[6px] text-gray-500 tracking-wider pt-2 border-t border-purple-950">ACTUALIZADO EN TIEMRE REAL</div>
                     </div>
                 </div>
             </div>
@@ -485,19 +487,31 @@ export default function App() {
             </div>
         </div>
     
-        <div id="mobileControls" class="w-full grid grid-cols-2 gap-4 mt-4 px-2 md:hidden">
+        <!-- Teclera virtual unificada y táctil ergonómica para celulares de cualquier tamaño -->
+        <div id="mobileControls" class="w-full grid grid-cols-2 gap-3 mt-3 px-1 md:hidden select-none touch-none">
             <div class="grid grid-cols-2 gap-2">
-                <button id="btnJump" class="bg-blue-600 active:bg-blue-500 border-2 border-white rounded-xl py-4 flex flex-col items-center justify-center text-sm font-bold">
-                    <span>↑ SALTÁ</span>
+                <button id="btnJump" class="bg-red-600 border border-white/20 rounded-2xl py-3.5 flex flex-col items-center justify-center font-black text-xs tracking-tight shadow-lg shadow-red-600/15 active:bg-red-500 active:scale-95 transition-all">
+                    <span class="text-[16px] mb-0.5">↑</span>
+                    <span class="text-[8px] tracking-widest">SALTÁ</span>
                 </button>
-                <button id="btnGrind" class="bg-yellow-500 active:bg-yellow-400 border-2 border-white rounded-xl py-4 flex flex-col items-center justify-center text-sm text-black font-extrabold">
-                    <span>⚡ GRIND (MANTENER)</span>
+                <button id="btnGrind" class="bg-cyan-500 border border-white/20 rounded-2xl py-3.5 flex flex-col items-center justify-center font-black text-xs tracking-tight text-black shadow-lg shadow-cyan-500/15 active:bg-cyan-400 active:scale-95 transition-all">
+                    <span class="text-[16px] mb-0.5">⚡</span>
+                    <span class="text-[8px] tracking-widest">GRIND</span>
                 </button>
             </div>
-            <div class="grid grid-cols-3 gap-2">
-                <button id="btnTrickZ" class="bg-purple-800 active:bg-purple-500 border border-gray-600 rounded-xl py-4 text-[9px] font-bold">Z (FLIP)</button>
-                <button id="btnTrickX" class="bg-purple-800 active:bg-purple-500 border border-gray-600 rounded-xl py-4 text-[9px] font-bold">X (SPIN)</button>
-                <button id="btnTrickC" class="bg-purple-800 active:bg-purple-500 border border-gray-600 rounded-xl py-4 text-[9px] font-bold">C (GRAB)</button>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button id="btnTrickZ" class="bg-zinc-900 border border-purple-500/30 rounded-2xl py-3.5 flex flex-col items-center justify-center font-black text-[10px] text-purple-400 active:bg-purple-900 active:text-white shadow-md active:scale-95 transition-all">
+                    <span>Z</span>
+                    <span class="text-[6px] tracking-wide opacity-80 mt-0.5">FLIP</span>
+                </button>
+                <button id="btnTrickX" class="bg-zinc-900 border border-purple-500/30 rounded-2xl py-3.5 flex flex-col items-center justify-center font-black text-[10px] text-purple-400 active:bg-purple-900 active:text-white shadow-md active:scale-95 transition-all">
+                    <span>X</span>
+                    <span class="text-[6px] tracking-wide opacity-80 mt-0.5">SPIN</span>
+                </button>
+                <button id="btnTrickC" class="bg-zinc-900 border border-purple-500/30 rounded-2xl py-3.5 flex flex-col items-center justify-center font-black text-[10px] text-purple-400 active:bg-purple-900 active:text-white shadow-md active:scale-95 transition-all">
+                    <span>C</span>
+                    <span class="text-[6px] tracking-wide opacity-80 mt-0.5">GRAB</span>
+                </button>
             </div>
         </div>
     </div>
@@ -749,8 +763,8 @@ export default function App() {
         currentTrick: "",
         trickDisplayTimer: 0,
         animFrame: 0,
-        baseSpeedX: 4.0, // Bajado de 5.5 a 4.0 para hacerlo más controlable y divertido
-        speedX: 4.0,     // Bajado de 5.5 a 4.0 para balancear la dificultad inicial
+        baseSpeedX: 4.0, 
+        speedX: 4.0,     
         crashed: false
     };
     
@@ -798,7 +812,7 @@ export default function App() {
     }
     
     function createProceduralObstacle(startX) {
-        const gap = Math.floor(Math.random() * 100) + 70; // Bajado de 120+90 para que sea más fácil de saltar a menor velocidad
+        const gap = Math.floor(Math.random() * 100) + 70; 
         const width = Math.floor(Math.random() * 150) + 120; 
         const heightChange = (Math.random() - 0.5) * 80; 
         
@@ -850,29 +864,41 @@ export default function App() {
         keys[e.code] = false;
     });
     
-    let touchGrinding = false;
-    const btnJump = document.getElementById("btnJump");
-    const btnGrind = document.getElementById("btnGrind");
+    // Bind táctil súper optimizado para evitar "inputs trabados" (stuck touches) en celulares
+    function bindTouchControl(elementId, keyToTrigger) {
+        const btn = document.getElementById(elementId);
+        if (!btn) return;
     
-    if (btnJump) {
-        btnJump.addEventListener("touchstart", (e) => { e.preventDefault(); keys["ArrowUp"] = true; });
-        btnJump.addEventListener("touchend", (e) => { e.preventDefault(); keys["ArrowUp"] = false; });
-    }
-    if (btnGrind) {
-        btnGrind.addEventListener("touchstart", (e) => { e.preventDefault(); keys["Space"] = true; });
-        btnGrind.addEventListener("touchend", (e) => { e.preventDefault(); keys["Space"] = false; });
+        const press = (e) => {
+            e.preventDefault();
+            keys[keyToTrigger] = true;
+            if (navigator.vibrate) {
+                try { navigator.vibrate(10); } catch(err) {} // Vibración hápitca súper premium para feedback de control
+            }
+        };
+    
+        const release = (e) => {
+            e.preventDefault();
+            keys[keyToTrigger] = false;
+        };
+    
+        // Soporte nativo para pantallas táctiles de cualquier celular
+        btn.addEventListener("touchstart", press, { passive: false });
+        btn.addEventListener("touchend", release, { passive: false });
+        btn.addEventListener("touchcancel", release, { passive: false });
+    
+        // Soporte fallback para mouse (emulador de escritorio o tablets con puntero)
+        btn.addEventListener("mousedown", press);
+        btn.addEventListener("mouseup", release);
+        btn.addEventListener("mouseleave", release);
     }
     
-    function setupMobileTrick(id, key) {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.addEventListener("touchstart", (e) => { e.preventDefault(); keys[key] = true; });
-            btn.addEventListener("touchend", (e) => { e.preventDefault(); keys[key] = false; });
-        }
-    }
-    setupMobileTrick("btnTrickZ", "KeyZ");
-    setupMobileTrick("btnTrickX", "KeyX");
-    setupMobileTrick("btnTrickC", "KeyC");
+    // Vinculación de los nuevos botones de Arcade Mobile adaptables
+    bindTouchControl("btnJump", "ArrowUp");
+    bindTouchControl("btnGrind", "Space");
+    bindTouchControl("btnTrickZ", "KeyZ");
+    bindTouchControl("btnTrickX", "KeyX");
+    bindTouchControl("btnTrickC", "KeyC");
     
     function triggerAirTrick(name, points) {
         player.currentTrick = \`\${name}! +\${points}\`;
@@ -890,6 +916,11 @@ export default function App() {
         crashTimer = 90; 
         flashAlpha = 0.8; 
         AudioEngine.sfxCrash();
+        
+        // Haptic feedback de choque (fuerte vibración intermitente si el celu lo soporta)
+        if (navigator.vibrate) {
+            try { navigator.vibrate([80, 50, 120]); } catch(err) {}
+        }
         
         if (player.score > personalHighScore) {
             personalHighScore = player.score;
@@ -958,7 +989,7 @@ export default function App() {
     
         if (gameState !== "PLAYING") return;
     
-        player.speedX = player.baseSpeedX + (player.distance * 0.0015); // Bajado el multiplicador de velocidad de 0.003 a 0.0015 para una progresión más justa
+        player.speedX = player.baseSpeedX + (player.distance * 0.0015); 
         player.distance += player.speedX * 0.02;
     
         player.x += player.speedX;
@@ -1511,14 +1542,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Arcade Game Section */}
+        {/* Arcade Game Section con soporte adaptativo e iframe responsivo */}
         {activeTab === 'game' && (
           <div className="w-full flex flex-col items-center justify-center">
             <div className="w-full max-w-4xl bg-zinc-950 border border-purple-500/30 rounded-[2.5rem] p-2 md:p-6 shadow-2xl shadow-purple-950/40 relative">
               <iframe
                 title="AGGRETV Endless Retro Roller"
                 srcDoc={gameSrcDoc}
-                className="w-full h-[620px] md:h-[650px] rounded-3xl border-0 overflow-hidden"
+                className="w-full h-[580px] sm:h-[620px] md:h-[650px] max-h-[85vh] rounded-3xl border-0 overflow-hidden"
                 allow="autoplay; gamepad"
                 sandbox="allow-scripts allow-same-origin"
               />
