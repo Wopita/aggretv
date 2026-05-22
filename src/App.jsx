@@ -10,7 +10,7 @@ import {
 import { 
   MapPin, Plus, Search, Users, Video, Image as ImageIcon, User, Navigation,
   ThumbsUp, X, ShieldCheck, Camera, ChevronLeft, ChevronRight, Zap, Globe, 
-  Loader2, Trash2, Edit3, Map as MapIcon, AlertTriangle
+  Loader2, Trash2, Edit3, Map as MapIcon, AlertTriangle, Gamepad2
 } from 'lucide-react';
 
 const firebaseConfig = {
@@ -351,6 +351,1038 @@ export default function App() {
     } finally { setIsLoading(false); }
   };
 
+  // Codificación segura del juego retro adaptado a iframe con comunicación online a Firestore
+  const gameSrcDoc = useMemo(() => {
+    const profileNameSanitized = userProfile?.name
+      ? userProfile.name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_ñÑ]/g, '').slice(0, 12).toUpperCase()
+      : '';
+
+    return `<!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <title>AGGRETV-GAME - Endless Retro Roller</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Press Start 2P', monospace;
+                background-color: #05020c;
+                overflow: hidden;
+                touch-action: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            canvas {
+                image-rendering: pixelated;
+                box-shadow: 0 0 35px rgba(255, 0, 110, 0.5);
+            }
+            @keyframes neon-flicker {
+                0%, 100% { text-shadow: 0 0 8px #ff007f, 0 0 15px #ff007f; }
+                50% { text-shadow: 0 0 3px #00f0ff, 0 0 8px #00f0ff; }
+            }
+            .neon-glow {
+                animation: neon-flicker 2.5s infinite;
+            }
+            .glass-panel {
+                background: rgba(15, 7, 28, 0.85);
+                border: 2px solid #ff007f;
+                box-shadow: 0 0 15px rgba(255, 0, 127, 0.3);
+            }
+            ::-webkit-scrollbar {
+                width: 6px;
+            }
+            ::-webkit-scrollbar-track {
+                background: #110924;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #00f0ff;
+                border-radius: 3px;
+            }
+        </style>
+    </head>
+    <body class="flex flex-col items-center justify-center min-h-screen text-white select-none">
+    
+    <script>
+      window.__app_id = "aggretv";
+      window.__firebase_config = '${JSON.stringify(firebaseConfig)}';
+      window.__initial_auth_token = null;
+      window.__initial_rider_name = "${profileNameSanitized}";
+    </script>
+    
+    <div class="relative w-full max-w-4xl p-2 flex flex-col items-center">
+        <div class="w-full flex justify-between items-center px-4 py-2 bg-purple-950/40 rounded-t-xl border-t-2 border-x-2 border-pink-500/50">
+            <div class="flex items-center gap-2">
+                <span class="inline-block w-3 h-3 bg-green-500 rounded-full animate-ping"></span>
+                <span id="statusBarText" class="text-[8px] text-cyan-400 tracking-wider">MODO ONLINE ACTIVO</span>
+            </div>
+            <button id="btnMuteGlobal" class="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 active:scale-95 border border-white rounded text-[8px] font-bold tracking-widest transition">
+                🎵 MÚSICA: ON
+            </button>
+        </div>
+    
+        <div class="relative bg-black border-4 border-cyan-400 rounded-b-xl overflow-hidden w-full aspect-[16/9]">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+    
+            <div id="startScreen" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-4 md:p-6 text-center z-10 overflow-y-auto">
+                <h1 class="text-3xl md:text-5xl font-extrabold text-pink-500 mb-1 neon-glow tracking-wider">AGGRETV-GAME</h1>
+                <h2 class="text-[10px] md:text-xs font-bold text-cyan-400 mb-4 tracking-widest">ENDLESS ROLLER COMPETITION</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 w-full max-w-4xl items-stretch">
+                    <div class="md:col-span-7 flex flex-col items-center justify-center glass-panel p-4 rounded-xl">
+                        <p class="text-[8px] text-yellow-400 font-bold mb-3 tracking-wide">¡ENTRENA TU RIDER Y REGISTRA TU RECORD!</p>
+                        
+                        <div class="w-full max-w-xs mb-4">
+                            <label for="riderNameInput" class="block text-[8px] text-gray-400 mb-2 uppercase tracking-widest">Apodo del Raider:</label>
+                            <input type="text" id="riderNameInput" class="w-full bg-black border-2 border-cyan-400 text-white rounded px-3 py-2 text-center text-[10px] tracking-widest font-bold uppercase focus:outline-none focus:border-pink-500 transition placeholder-purple-900" placeholder="SIN_NOMBRE" maxlength="12">
+                        </div>
+    
+                        <button id="startButton" class="w-full max-w-xs px-6 py-3.5 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white rounded-lg border-2 border-white shadow-lg shadow-pink-500/50 transform active:scale-95 transition text-[10px] font-bold cursor-pointer uppercase tracking-widest mb-4">
+                            ¡INICIAR DESAFÍO!
+                        </button>
+    
+                        <div class="hidden md:block text-[7px] text-gray-400 text-left border-t border-gray-800 pt-3 w-full max-w-xs">
+                            <span class="text-cyan-400 font-bold">SALTAR:</span> Flecha Arriba ↑<br>
+                            <span class="text-yellow-400 font-bold">GRINDEAR:</span> MANTENER ESPACIO (Rieles)<br>
+                            <span class="text-pink-500 font-bold">TRUCOS DE AIRE:</span> Z, X, C | Rotas con ← / →
+                        </div>
+                    </div>
+    
+                    <div class="md:col-span-5 flex flex-col glass-panel p-4 rounded-xl min-h-[160px] md:min-h-0 justify-between">
+                        <h3 class="text-[9px] text-cyan-400 border-b border-purple-800 pb-2 uppercase tracking-widest font-bold">TOP 5 RANKING MUNDIAL</h3>
+                        <div id="leaderboardList" class="flex-grow flex flex-col justify-center text-left text-[8px] py-2 space-y-1.5 font-bold">
+                            <p class="text-center text-gray-500 animate-pulse">SINTONIZANDO SEÑAL...</p>
+                        </div>
+                        <div class="text-[6px] text-gray-500 tracking-wider pt-2 border-t border-purple-950">ACTUALIZADO EN TIEMPO REAL</div>
+                    </div>
+                </div>
+            </div>
+    
+            <div id="gameOverScreen" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-4 text-center z-10 transition-opacity duration-700 opacity-0 pointer-events-none overflow-y-auto">
+                <h2 class="text-2xl md:text-3xl font-bold text-red-500 mb-1 neon-glow tracking-wider">💥 ¡CRASH EXTREMO! 💥</h2>
+                <p id="gameOverReason" class="text-[8px] md:text-xs text-yellow-400 mb-4">Mala caída del rider virtual</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-4 items-stretch">
+                    <div class="glass-panel p-4 rounded-lg text-left text-[8px] md:text-[10px] flex flex-col justify-center space-y-2">
+                        <p class="text-gray-400 uppercase">RIDER: <span id="finalRiderName" class="text-yellow-400 font-bold">???</span></p>
+                        <p class="text-gray-400">PUNTAJE FINAL: <span id="finalScore" class="text-white font-bold">0</span></p>
+                        <p class="text-gray-400">DISTANCIA TOTAL: <span id="finalDistance" class="text-cyan-400 font-bold">0m</span></p>
+                        <p class="text-gray-400">MEJOR PERSONAL: <span id="bestRecord" class="text-pink-500 font-bold">0</span></p>
+                    </div>
+    
+                    <div class="glass-panel p-3 rounded-lg text-left flex flex-col justify-between">
+                        <h3 class="text-[7px] md:text-[8px] text-cyan-400 border-b border-purple-800 pb-1.5 font-bold tracking-wider uppercase text-center">Clasificación Al Instante</h3>
+                        <div id="gameOverLeaderboardList" class="flex-grow flex flex-col justify-center text-[7px] md:text-[8px] space-y-1 py-2 font-bold">
+                            <p class="text-center text-gray-500 animate-pulse">CARGANDO...</p>
+                        </div>
+                    </div>
+                </div>
+    
+                <button id="restartButton" class="px-6 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-lg border-2 border-white shadow-lg transform active:scale-95 transition text-[9px] font-bold cursor-pointer uppercase tracking-wider">
+                    INTENTAR DE NUEVO [ESPACIO]
+                </button>
+            </div>
+        </div>
+    
+        <div id="mobileControls" class="w-full grid grid-cols-2 gap-4 mt-4 px-2 md:hidden">
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btnJump" class="bg-blue-600 active:bg-blue-500 border-2 border-white rounded-xl py-4 flex flex-col items-center justify-center text-sm font-bold">
+                    <span>↑ SALTÁ</span>
+                </button>
+                <button id="btnGrind" class="bg-yellow-500 active:bg-yellow-400 border-2 border-white rounded-xl py-4 flex flex-col items-center justify-center text-sm text-black font-extrabold">
+                    <span>⚡ GRIND (MANTENER)</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <button id="btnTrickZ" class="bg-purple-800 active:bg-purple-500 border border-gray-600 rounded-xl py-4 text-[9px] font-bold">Z (FLIP)</button>
+                <button id="btnTrickX" class="bg-purple-800 active:bg-purple-500 border border-gray-600 rounded-xl py-4 text-[9px] font-bold">X (SPIN)</button>
+                <button id="btnTrickC" class="bg-purple-800 active:bg-purple-500 border border-gray-600 rounded-xl py-4 text-[9px] font-bold">C (GRAB)</button>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    
+    const appId = window.__app_id || 'aggretv';
+    const firebaseConfigRaw = window.__firebase_config || null;
+    const initialAuthToken = window.__initial_auth_token || null;
+    
+    let db = null;
+    let auth = null;
+    let isFirebaseActive = false;
+    
+    async function initDatabase() {
+        const statusText = document.getElementById("statusBarText");
+        if (firebaseConfigRaw) {
+            try {
+                const firebaseConfig = JSON.parse(firebaseConfigRaw);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+    
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+    
+                isFirebaseActive = true;
+                if (statusText) statusText.innerText = "MODO ONLINE ACTIVO";
+            } catch (e) {
+                console.error("Firebase connection error, moving to Offline Mode:", e);
+                if (statusText) statusText.innerText = "SISTEMA LOCAL (LOCALSTORAGE)";
+            }
+        } else {
+            if (statusText) statusText.innerText = "SISTEMA LOCAL (LOCALSTORAGE)";
+        }
+    }
+    
+    function getLocalScores() {
+        try {
+            return JSON.parse(localStorage.getItem("aggretv_scores")) || [];
+        } catch (e) {
+            return [];
+        }
+    }
+    
+    function saveLocalScore(rider, score, distance) {
+        const scores = getLocalScores();
+        scores.push({
+            riderName: rider,
+            score: score,
+            distance: Math.floor(distance),
+            timestamp: Date.now()
+        });
+        scores.sort((a, b) => b.score - a.score);
+        localStorage.setItem("aggretv_scores", JSON.stringify(scores.slice(0, 50)));
+    }
+    
+    async function recordHighScore(riderName, score, distance) {
+        saveLocalScore(riderName, score, distance);
+        if (!isFirebaseActive || !auth || !auth.currentUser) return;
+        
+        try {
+            const scoresCollection = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+            await addDoc(scoresCollection, {
+                riderName: riderName,
+                score: score,
+                distance: Math.floor(distance),
+                timestamp: Date.now()
+            });
+        } catch (e) {
+            console.error("Failed to sync score online:", e);
+        }
+    }
+    
+    async function fetchHighScores() {
+        let rawList = [];
+        if (isFirebaseActive && auth && auth.currentUser) {
+            try {
+                const scoresCollection = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+                const snap = await getDocs(scoresCollection);
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.riderName && typeof data.score === 'number') {
+                        rawList.push(data);
+                    }
+                });
+            } catch (e) {
+                console.error("Error reading from Firestore:", e);
+                rawList = getLocalScores();
+            }
+        } else {
+            rawList = getLocalScores();
+        }
+    
+        rawList.sort((a, b) => b.score - a.score || b.distance - a.distance);
+    
+        const uniqueRiders = [];
+        const keysSeen = new Set();
+        for (const item of rawList) {
+            const uKey = \`\${item.riderName.toUpperCase()}\`;
+            if (!keysSeen.has(uKey)) {
+                keysSeen.add(uKey);
+                uniqueRiders.push(item);
+            }
+        }
+    
+        return uniqueRiders.slice(0, 10);
+    }
+    
+    const AudioEngine = {
+        ctx: null,
+        isPlaying: false,
+        synthInterval: null,
+        musicVolume: 0.12,
+        isMusicMuted: false,
+    
+        init() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+                this.isPlaying = true;
+            } catch (e) {
+                console.error("AudioContext not supported", e);
+            }
+        },
+    
+        playTone(freq, type, duration, slideTo = 0) {
+            if (!this.ctx || this.ctx.state === 'suspended' || this.isMusicMuted) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+    
+            osc.type = type || 'sine';
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            
+            if (slideTo > 0) {
+                osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+            }
+    
+            gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        },
+    
+        playNoise(duration, lowFreq = false) {
+            if (!this.ctx || this.isMusicMuted) return;
+            const bufferSize = this.ctx.sampleRate * duration;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            let lastOut = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                if (lowFreq) {
+                    data[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = data[i];
+                    data[i] *= 3.5; 
+                } else {
+                    data[i] = white * 0.3;
+                }
+            }
+    
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+            noise.connect(gain);
+            gain.connect(this.ctx.destination);
+            noise.start();
+        },
+    
+        sfxJump() { this.playTone(200, 'square', 0.12, 500); },
+        sfxGrind() { this.playNoise(0.05, false); },
+        sfxTrick() { this.playTone(400, 'triangle', 0.15, 900); },
+        sfxCrash() { this.playNoise(0.5, true); this.playTone(150, 'sawtooth', 0.4, 30); },
+        sfxScore() { this.playTone(523.25, 'sine', 0.08, 1046.50); },
+    
+        toggleMusic() {
+            if (!this.ctx) this.init();
+            if (this.synthInterval) {
+                clearInterval(this.synthInterval);
+                this.synthInterval = null;
+                return;
+            }
+    
+            const bassline = [110.00, 110.00, 130.81, 130.81, 146.83, 146.83, 164.81, 164.81];
+            let step = 0;
+            this.synthInterval = setInterval(() => {
+                if (this.ctx && this.ctx.state !== 'suspended' && !this.isMusicMuted) {
+                    const note = bassline[step % bassline.length];
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(note, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.18);
+                    step++;
+                }
+            }, 180);
+        }
+    };
+    
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    
+    const GAME_WIDTH = 800;
+    const GAME_HEIGHT = 450;
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
+    
+    let gameState = "START";
+    let cameraX = 0;
+    let personalHighScore = localStorage.getItem("endless_skate_highscore") || 0;
+    let crashTimer = 0;
+    let flashAlpha = 0;
+    let activeRiderName = window.__initial_rider_name || localStorage.getItem("aggretv_saved_rider") || "RIDER_1";
+    
+    const player = {
+        x: 100,
+        y: 200,
+        width: 24,
+        height: 44,
+        vx: 0,
+        vy: 0,
+        angle: 0, 
+        gravity: 0.42,
+        jumpForce: -10,
+        isGrounded: false,
+        isGrinding: false,
+        grindPointsTimer: 0,
+        score: 0,
+        distance: 0,
+        combo: 0,
+        multiplier: 1,
+        currentTrick: "",
+        trickDisplayTimer: 0,
+        animFrame: 0,
+        baseSpeedX: 4.0, // Bajado de 5.5 a 4.0 para hacerlo más controlable y divertido
+        speedX: 4.0,     // Bajado de 5.5 a 4.0 para balancear la dificultad inicial
+        crashed: false
+    };
+    
+    let rails = [];
+    let particles = [];
+    
+    function addSpark(x, y) {
+        particles.push({
+            x: x,
+            y: y,
+            vx: (Math.random() - 0.5) * 6,
+            vy: -Math.random() * 4,
+            color: \"hsl(\${Math.random() * 50 + 320}, 100%, 60%)\", 
+            size: Math.random() * 3 + 2,
+            life: 1.0
+        });
+    }
+    
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.12; 
+            p.life -= 0.05;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+    
+    function generateInitialRails() {
+        rails = [];
+        rails.push({
+            x: 0,
+            y: 280,
+            width: 350,
+            height: 12,
+            type: "platform",
+            label: "Pista Inicial"
+        });
+    
+        let currentX = 350;
+        for (let i = 0; i < 5; i++) {
+            currentX = createProceduralObstacle(currentX);
+        }
+    }
+    
+    function createProceduralObstacle(startX) {
+        const gap = Math.floor(Math.random() * 100) + 70; // Bajado de 120+90 para que sea más fácil de saltar a menor velocidad
+        const width = Math.floor(Math.random() * 150) + 120; 
+        const heightChange = (Math.random() - 0.5) * 80; 
+        
+        let targetY = 280 + heightChange;
+        if (targetY < 180) targetY = 180;
+        if (targetY > 340) targetY = 340;
+    
+        const types = ["rail", "platform", "kink-rail"];
+        const chosenType = types[Math.floor(Math.random() * types.length)];
+    
+        rails.push({
+            x: startX + gap,
+            y: targetY,
+            width: width,
+            height: chosenType === "platform" ? 14 : 8,
+            type: chosenType,
+            label: chosenType === "rail" ? "Neon Rail" : chosenType === "kink-rail" ? "Kink Ledge" : "Futur Platform"
+        });
+    
+        return startX + gap + width;
+    }
+    
+    function updateProceduralGeneration() {
+        const lastRail = rails[rails.length - 1];
+        if (lastRail.x < player.x + GAME_WIDTH) {
+            createProceduralObstacle(lastRail.x);
+        }
+    
+        if (rails.length > 15) {
+            if (rails[0].x + rails[0].width < cameraX - 100) {
+                rails.shift();
+            }
+        }
+    }
+    
+    const keys = {};
+    window.addEventListener("keydown", e => {
+        keys[e.code] = true;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+            e.preventDefault();
+        }
+        if (e.code === "Space") {
+            if (gameState === "GAMEOVER") {
+                restartGame();
+            }
+        }
+    });
+    window.addEventListener("keyup", e => {
+        keys[e.code] = false;
+    });
+    
+    let touchGrinding = false;
+    const btnJump = document.getElementById("btnJump");
+    const btnGrind = document.getElementById("btnGrind");
+    
+    if (btnJump) {
+        btnJump.addEventListener("touchstart", (e) => { e.preventDefault(); keys["ArrowUp"] = true; });
+        btnJump.addEventListener("touchend", (e) => { e.preventDefault(); keys["ArrowUp"] = false; });
+    }
+    if (btnGrind) {
+        btnGrind.addEventListener("touchstart", (e) => { e.preventDefault(); keys["Space"] = true; });
+        btnGrind.addEventListener("touchend", (e) => { e.preventDefault(); keys["Space"] = false; });
+    }
+    
+    function setupMobileTrick(id, key) {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener("touchstart", (e) => { e.preventDefault(); keys[key] = true; });
+            btn.addEventListener("touchend", (e) => { e.preventDefault(); keys[key] = false; });
+        }
+    }
+    setupMobileTrick("btnTrickZ", "KeyZ");
+    setupMobileTrick("btnTrickX", "KeyX");
+    setupMobileTrick("btnTrickC", "KeyC");
+    
+    function triggerAirTrick(name, points) {
+        player.currentTrick = \`\${name}! +\${points}\`;
+        player.trickDisplayTimer = 45;
+        player.combo += points;
+        player.multiplier += 1;
+        AudioEngine.sfxTrick();
+    }
+    
+    function triggerCrashAnimation(reason) {
+        gameState = "CRASHING";
+        player.crashed = true;
+        player.vy = -8; 
+        player.vx = -player.speedX * 0.4; 
+        crashTimer = 90; 
+        flashAlpha = 0.8; 
+        AudioEngine.sfxCrash();
+        
+        if (player.score > personalHighScore) {
+            personalHighScore = player.score;
+            localStorage.setItem("endless_skate_highscore", personalHighScore);
+        }
+    
+        recordHighScore(activeRiderName, player.score, player.distance).then(() => {
+            refreshLeaderboards();
+        });
+    
+        document.getElementById("gameOverReason").innerText = reason;
+        document.getElementById("finalScore").innerText = player.score;
+        document.getElementById("finalDistance").innerText = \`\${Math.floor(player.distance)}m\`;
+        document.getElementById("bestRecord").innerText = personalHighScore;
+        document.getElementById("finalRiderName").innerText = activeRiderName;
+    }
+    
+    async function refreshLeaderboards() {
+        const highScores = await fetchHighScores();
+        const activeStartList = document.getElementById("leaderboardList");
+        const activeOverList = document.getElementById("gameOverLeaderboardList");
+    
+        const buildHTML = (list) => {
+            if (list.length === 0) {
+                return \`<div class="text-center text-gray-500 py-4">SIN REGISTROS AÚN</div>\`;
+            }
+            return list.slice(0, 5).map((u, i) => {
+                const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : \`\${i+1}.\`;
+                const labelColor = i === 0 ? "text-yellow-400" : i === 1 ? "text-cyan-300" : i === 2 ? "text-pink-400" : "text-gray-300";
+                return \`
+                    <div class="flex justify-between items-center \${labelColor} text-[8px] tracking-wide">
+                        <span>\${medal} \${u.riderName.toUpperCase()}</span>
+                        <span>\${u.score} pts</span>
+                    </div>
+                \`;
+            }).join("");
+        };
+    
+        const renderedHTML = buildHTML(highScores);
+        if (activeStartList) activeStartList.innerHTML = renderedHTML;
+        if (activeOverList) activeOverList.innerHTML = renderedHTML;
+    }
+    
+    function update() {
+        if (gameState === "CRASHING") {
+            player.vy += player.gravity * 0.8; 
+            player.x += player.vx;
+            player.y += player.vy;
+            player.angle += 12; 
+    
+            cameraX += (player.x - 200 - cameraX) * 0.05;
+    
+            if (flashAlpha > 0) flashAlpha -= 0.03;
+    
+            updateParticles();
+            crashTimer--;
+    
+            if (crashTimer <= 0 || player.y > GAME_HEIGHT + 100) {
+                gameState = "GAMEOVER";
+                const goScreen = document.getElementById("gameOverScreen");
+                goScreen.classList.remove("pointer-events-none");
+                goScreen.classList.add("opacity-100");
+            }
+            return;
+        }
+    
+        if (gameState !== "PLAYING") return;
+    
+        player.speedX = player.baseSpeedX + (player.distance * 0.0015); // Bajado el multiplicador de velocidad de 0.003 a 0.0015 para una progresión más justa
+        player.distance += player.speedX * 0.02;
+    
+        player.x += player.speedX;
+        player.animFrame += 0.22;
+    
+        if (keys["ArrowUp"] && (player.isGrounded || player.isGrinding)) {
+            player.vy = player.jumpForce;
+            player.isGrounded = false;
+            player.isGrinding = false;
+            AudioEngine.sfxJump();
+        }
+    
+        player.vy += player.gravity;
+        player.y += player.vy;
+    
+        if (player.y > GAME_HEIGHT) {
+            triggerCrashAnimation("💥 ¡CAÍSTE AL ABISMO VIRTUAL! 💥");
+            return;
+        }
+    
+        if (!player.isGrounded && !player.isGrinding) {
+            if (keys["ArrowRight"]) {
+                player.angle += 8;
+                if (Math.floor(player.angle) % 360 === 0) {
+                    triggerAirTrick("360 Spin", 150);
+                }
+            } else if (keys["ArrowLeft"]) {
+                player.angle -= 8;
+                if (Math.floor(player.angle) % 360 === 0) {
+                    triggerAirTrick("Backside 360", 150);
+                }
+            }
+    
+            if (keys["KeyZ"] && player.trickDisplayTimer <= 0) {
+                triggerAirTrick("Backflip", 250);
+                player.angle += 180; 
+            } else if (keys["KeyX"] && player.trickDisplayTimer <= 0) {
+                triggerAirTrick("Rocket Grab", 200);
+            } else if (keys["KeyC"] && player.trickDisplayTimer <= 0) {
+                triggerAirTrick("Method Air", 180);
+            }
+        }
+    
+        let isOnAnything = false;
+        const playerFeetX = player.x + player.width / 2;
+        const playerFeetY = player.y + player.height;
+    
+        for (let rail of rails) {
+            if (playerFeetX >= rail.x && playerFeetX <= rail.x + rail.width) {
+                if (playerFeetY >= rail.y - 12 && playerFeetY <= rail.y + 14) {
+                    isOnAnything = true;
+    
+                    if (rail.type === "platform") {
+                        if (player.vy >= 0) {
+                            if (!player.isGrounded) {
+                                checkLandingAngle();
+                            }
+                            if (gameState === "PLAYING") {
+                                player.y = rail.y - player.height;
+                                player.vy = 0;
+                                player.isGrounded = true;
+                                player.isGrinding = false;
+                            }
+                        }
+                    } 
+                    else if (rail.type === "rail" || rail.type === "kink-rail") {
+                        if (player.vy >= 0) {
+                            if (keys["Space"]) {
+                                if (!player.isGrinding) {
+                                    checkLandingAngle();
+                                    if (gameState === "PLAYING") {
+                                        player.isGrinding = true;
+                                        player.isGrounded = false;
+                                        triggerAirTrick(rail.type === "kink-rail" ? "Kink Grind" : "Fastslide", 100);
+                                    }
+                                }
+                                if (gameState === "PLAYING") {
+                                    player.y = rail.y - player.height;
+                                    player.vy = 0;
+                                    player.angle = 0; 
+    
+                                    player.grindPointsTimer++;
+                                    if (player.grindPointsTimer % 3 === 0) {
+                                        player.score += 2 * player.multiplier;
+                                        addSpark(playerFeetX, playerFeetY);
+                                    }
+                                    if (Math.random() < 0.15) {
+                                        AudioEngine.sfxGrind();
+                                    }
+                                }
+                            } else {
+                                triggerCrashAnimation("💥 ¡CHOCASTE CONTRA EL RIEL SIN MANTENER ESPACIO! 💥");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    
+        if (player.isGrinding && !keys["Space"]) {
+            player.isGrinding = false;
+            player.vy = 1;
+        }
+    
+        if (!isOnAnything) {
+            player.isGrounded = false;
+            player.isGrinding = false;
+        }
+    
+        if (player.trickDisplayTimer > 0) {
+            player.trickDisplayTimer--;
+        } else {
+            player.currentTrick = "";
+        }
+    
+        const targetCameraX = player.x - 150;
+        cameraX += (targetCameraX - cameraX) * 0.15;
+    
+        updateProceduralGeneration();
+        updateParticles();
+    }
+    
+    function checkLandingAngle() {
+        const angleNormalized = Math.abs(player.angle % 360);
+        if (angleNormalized > 45 && angleNormalized < 315) {
+            triggerCrashAnimation("💥 ¡MALA CAÍDA! NO ATERRIZASTE DERECHO 💥");
+        } else {
+            if (player.combo > 0) {
+                player.score += player.combo * player.multiplier;
+                player.combo = 0;
+                player.multiplier = 1;
+                AudioEngine.sfxScore();
+            }
+            player.angle = 0;
+        }
+    }
+    
+    function draw() {
+        ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+    
+        const skyGrad = ctx.createLinearGradient(cameraX, 0, cameraX, GAME_HEIGHT);
+        skyGrad.addColorStop(0, "#080112");
+        skyGrad.addColorStop(0.5, "#210535");
+        skyGrad.addColorStop(1, "#430d4b");
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(cameraX, 0, GAME_WIDTH, GAME_HEIGHT);
+    
+        const sunX = cameraX + GAME_WIDTH / 2 + 150;
+        const sunY = 150;
+        ctx.fillStyle = "#ff0066";
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 65, 0, Math.PI * 2);
+        ctx.fill();
+    
+        ctx.fillStyle = "#210535";
+        for (let i = 0; i < 7; i++) {
+            const height = 3 + i * 2;
+            ctx.fillRect(sunX - 75, sunY + 5 + i * 11, 150, height);
+        }
+    
+        ctx.fillStyle = "#150221";
+        ctx.beginPath();
+        for (let i = 0; i < 20; i++) {
+            const mX = (i * 180) - (cameraX * 0.2) % 300;
+            ctx.lineTo(mX, GAME_HEIGHT - 100);
+            ctx.lineTo(mX + 90, GAME_HEIGHT - 220 - (i % 2 * 30));
+            ctx.lineTo(mX + 180, GAME_HEIGHT - 100);
+        }
+        ctx.lineTo(cameraX + GAME_WIDTH + 200, GAME_HEIGHT);
+        ctx.lineTo(cameraX - 100, GAME_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+    
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.15)";
+        ctx.lineWidth = 1;
+        const gridY = 390;
+        ctx.beginPath();
+        ctx.moveTo(cameraX, gridY);
+        ctx.lineTo(cameraX + GAME_WIDTH, gridY);
+        ctx.stroke();
+    
+        for (let x = cameraX - (cameraX % 40); x < cameraX + GAME_WIDTH + 40; x += 40) {
+            ctx.beginPath();
+            ctx.moveTo(x, gridY);
+            ctx.lineTo(x - 50, GAME_HEIGHT);
+            ctx.stroke();
+        }
+    
+        rails.forEach(rail => {
+            if (rail.type === "platform") {
+                ctx.fillStyle = "#101525";
+                ctx.fillRect(rail.x, rail.y, rail.width, rail.height);
+                ctx.fillStyle = "#00f0ff";
+                ctx.fillRect(rail.x, rail.y, rail.width, 3);
+            } else {
+                ctx.fillStyle = "#3a0066";
+                ctx.fillRect(rail.x + 15, rail.y + rail.height, 5, gridY - rail.y);
+                ctx.fillRect(rail.x + rail.width - 20, rail.y + rail.height, 5, gridY - rail.y);
+    
+                ctx.fillStyle = "#ff007f";
+                ctx.shadowColor = "#ff007f";
+                ctx.shadowBlur = 8;
+                ctx.fillRect(rail.x, rail.y, rail.width, rail.height);
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(rail.x, rail.y, rail.width, 2);
+                ctx.shadowBlur = 0; 
+            }
+    
+            ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.font = "6px 'Press Start 2P'";
+            ctx.fillText(rail.label, rail.x + 5, rail.y - 10);
+        });
+    
+        particles.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+        ctx.globalAlpha = 1.0;
+    
+        ctx.save();
+        const pCenterX = player.x + player.width / 2;
+        const pCenterY = player.y + player.height / 2;
+        ctx.translate(pCenterX, pCenterY);
+        ctx.rotate((player.angle * Math.PI) / 180);
+    
+        if (player.crashed) {
+            ctx.fillStyle = "#ff0055";
+            ctx.fillRect(-12, -10, 24, 15);
+            ctx.fillStyle = "#ffd59a";
+            ctx.fillRect(-6, -20, 12, 10);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-10, 5, 6, 8);
+            ctx.fillRect(4, 5, 6, 8);
+            ctx.fillStyle = "yellow";
+            ctx.font = "12px monospace";
+            ctx.fillText("*", -15, -25);
+            ctx.fillText("*", 15, -20);
+        } else {
+            ctx.fillStyle = "#ff007f";
+            ctx.fillRect(-8, -22, 16, 7);
+            ctx.fillStyle = "#000000"; 
+            ctx.fillRect(4, -20, 4, 3); 
+    
+            ctx.fillStyle = "#ffd59a";
+            ctx.fillRect(-6, -15, 12, 7);
+    
+            ctx.fillStyle = player.isGrinding ? "#00ffff" : "#7b2cbf";
+            ctx.fillRect(-9, -8, 18, 16);
+    
+            ctx.fillStyle = "#ffd59a";
+            if (player.isGrinding) {
+                ctx.fillRect(-15, -4, 6, 4); 
+                ctx.fillRect(9, -4, 6, 4);
+            } else if (!player.isGrounded) {
+                ctx.fillRect(-13, -12, 4, 8); 
+                ctx.fillRect(9, -12, 4, 8);
+            } else {
+                const swing = Math.sin(player.animFrame) * 3;
+                ctx.fillRect(-13, -4 + swing, 4, 8); 
+                ctx.fillRect(9, -4 - swing, 4, 8);
+            }
+    
+            ctx.fillStyle = "#10002b";
+            ctx.fillRect(-8, 8, 16, 8);
+    
+            ctx.fillStyle = "#ffd59a";
+            ctx.fillRect(-6, 16, 4, 6);
+            ctx.fillRect(2, 16, 4, 6);
+    
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(-8, 22, 6, 4);
+            ctx.fillRect(2, 22, 6, 4);
+    
+            ctx.fillStyle = "#ff0055";
+            ctx.fillRect(-8, 26, 2, 2);
+            ctx.fillRect(-4, 26, 2, 2);
+            ctx.fillRect(2, 26, 2, 2);
+            ctx.fillRect(6, 26, 2, 2);
+        }
+        ctx.restore();
+    
+        if (player.currentTrick) {
+            ctx.fillStyle = "#00f0ff";
+            ctx.font = "8px 'Press Start 2P'";
+            ctx.textAlign = "center";
+            ctx.fillText(player.currentTrick, player.x + player.width / 2, player.y - 18);
+        }
+    
+        ctx.restore(); 
+    
+        if (flashAlpha > 0) {
+            ctx.fillStyle = \`rgba(255, 0, 0, \${flashAlpha})\`;
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        }
+    
+        ctx.fillStyle = "rgba(10, 5, 20, 0.75)";
+        ctx.strokeStyle = "#00f0ff";
+        ctx.lineWidth = 2;
+        ctx.fillRect(15, 15, 320, 80);
+        ctx.strokeRect(15, 15, 320, 80);
+    
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "7px 'Press Start 2P'";
+        ctx.textAlign = "left";
+        ctx.fillText(\`RAIDER: \${activeRiderName.toUpperCase()}\`, 25, 31);
+        ctx.fillText(\`PUNTAJE: \${player.score}\`, 25, 45);
+        ctx.fillText(\`DISTANCIA: \${Math.floor(player.distance)}m\`, 25, 59);
+        ctx.fillText(\`MULTI: x\${player.multiplier}\`, 25, 73);
+        ctx.fillText(\`VEL: \${(player.speedX * 5).toFixed(0)} KM/H\`, 25, 85);
+    
+        if (player.isGrinding) {
+            ctx.fillStyle = "#ff007f";
+            ctx.fillText("⚡ GRIND ACTIVO ⚡", 350, 31);
+        }
+    }
+    
+    function startGame() {
+        const rawInput = document.getElementById("riderNameInput").value.trim().replace(/\\s+/g, '_');
+        if (rawInput) {
+            activeRiderName = rawInput.toUpperCase();
+            localStorage.setItem("aggretv_saved_rider", activeRiderName);
+        } else {
+            activeRiderName = "RIDER_1";
+        }
+    
+        document.getElementById("startScreen").classList.add("hidden");
+        const goScreen = document.getElementById("gameOverScreen");
+        goScreen.classList.add("pointer-events-none");
+        goScreen.classList.remove("opacity-100");
+        
+        gameState = "PLAYING";
+        window.focus();
+        
+        if (!AudioEngine.isPlaying) {
+            AudioEngine.init();
+        }
+        if (!AudioEngine.synthInterval && !AudioEngine.isMusicMuted) {
+            AudioEngine.toggleMusic();
+        }
+    }
+    
+    function restartGame() {
+        const goScreen = document.getElementById("gameOverScreen");
+        goScreen.classList.add("pointer-events-none");
+        goScreen.classList.remove("opacity-100");
+        
+        player.x = 100;
+        player.y = 150;
+        player.vy = 0;
+        player.vx = 0;
+        player.angle = 0;
+        player.score = 0;
+        player.distance = 0;
+        player.combo = 0;
+        player.multiplier = 1;
+        player.crashed = false;
+        player.isGrounded = false;
+        player.isGrinding = false;
+        player.speedX = player.baseSpeedX;
+        
+        generateInitialRails();
+        cameraX = 0;
+        gameState = "PLAYING";
+        window.focus();
+    }
+    
+    document.getElementById("startButton").addEventListener("click", () => {
+        startGame();
+    });
+    
+    document.getElementById("restartButton").addEventListener("click", () => {
+        restartGame();
+    });
+    
+    const globalMuteBtn = document.getElementById("btnMuteGlobal");
+    if (globalMuteBtn) {
+        globalMuteBtn.addEventListener("click", () => {
+            AudioEngine.isMusicMuted = !AudioEngine.isMusicMuted;
+            if (AudioEngine.isMusicMuted) {
+                globalMuteBtn.innerText = "🎵 MÚSICA: OFF";
+                globalMuteBtn.classList.remove("bg-pink-600");
+                globalMuteBtn.classList.add("bg-gray-700");
+            } else {
+                globalMuteBtn.innerText = "🎵 MÚSICA: ON";
+                globalMuteBtn.classList.add("bg-pink-600");
+                globalMuteBtn.classList.remove("bg-gray-700");
+                if (gameState === "PLAYING" && !AudioEngine.synthInterval) {
+                    AudioEngine.toggleMusic();
+                }
+            }
+            window.focus();
+        });
+    }
+    
+    window.addEventListener("DOMContentLoaded", () => {
+        initDatabase().then(() => {
+            refreshLeaderboards();
+        });
+    
+        const nameInput = document.getElementById("riderNameInput");
+        if (nameInput) {
+            nameInput.value = activeRiderName;
+        }
+    });
+    
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+    
+    generateInitialRails();
+    gameLoop();
+    </script>
+    
+    </body>
+    </html>`;
+  }, [userProfile]); 
+
   return (
     <div className="min-h-screen bg-black text-white selection:bg-red-600 pb-24 font-sans">
       
@@ -363,8 +1395,10 @@ export default function App() {
           </div>
           
           <div className="hidden md:flex gap-8">
-            {['explore', 'riders', 'videos'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-red-600 border-b-2 border-red-600 pb-1' : 'text-zinc-500 hover:text-white'}`}>{tab === 'explore' ? 'Spots' : tab === 'videos' ? 'Videos' : 'Riders'}</button>
+            {['explore', 'riders', 'videos', 'game'].map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-red-600 border-b-2 border-red-600 pb-1' : 'text-zinc-500 hover:text-white'}`}>
+                {tab === 'explore' ? 'Spots' : tab === 'videos' ? 'Videos' : tab === 'riders' ? 'Riders' : 'Arcade 🕹️'}
+              </button>
             ))}
           </div>
 
@@ -391,21 +1425,22 @@ export default function App() {
       </nav>
 
       {/* Navegación Mobile */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[150] bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800 px-6 py-4 flex justify-around items-center">
-        <button onClick={() => setActiveTab('explore')} className={`flex flex-col items-center gap-1 ${activeTab === 'explore' ? 'text-red-600' : 'text-zinc-500'}`}><MapPin size={24}/><span className="text-[10px] font-black uppercase">Spots</span></button>
-        <button onClick={() => setActiveTab('riders')} className={`flex flex-col items-center gap-1 ${activeTab === 'riders' ? 'text-red-600' : 'text-zinc-500'}`}><Users size={24}/><span className="text-[10px] font-black uppercase">Riders</span></button>
-        <button onClick={() => setActiveTab('videos')} className={`flex flex-col items-center gap-1 ${activeTab === 'videos' ? 'text-red-600' : 'text-zinc-500'}`}><Video size={24}/><span className="text-[10px] font-black uppercase">Videos</span></button>
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[150] bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800 px-4 py-4 flex justify-around items-center">
+        <button onClick={() => setActiveTab('explore')} className={`flex flex-col items-center gap-1 ${activeTab === 'explore' ? 'text-red-600' : 'text-zinc-500'}`}><MapPin size={22}/><span className="text-[9px] font-black uppercase">Spots</span></button>
+        <button onClick={() => setActiveTab('riders')} className={`flex flex-col items-center gap-1 ${activeTab === 'riders' ? 'text-red-600' : 'text-zinc-500'}`}><Users size={22}/><span className="text-[9px] font-black uppercase">Riders</span></button>
+        <button onClick={() => setActiveTab('videos')} className={`flex flex-col items-center gap-1 ${activeTab === 'videos' ? 'text-red-600' : 'text-zinc-500'}`}><Video size={22}/><span className="text-[9px] font-black uppercase">Videos</span></button>
+        <button onClick={() => setActiveTab('game')} className={`flex flex-col items-center gap-1 ${activeTab === 'game' ? 'text-red-600' : 'text-zinc-500'}`}><Gamepad2 size={22}/><span className="text-[9px] font-black uppercase">Arcade</span></button>
       </div>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
         {/* Header Hero */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 border-l-4 border-red-600 pl-6">
           <div className="space-y-2">
-            <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : 'Videos'}</h2>
+            <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none">{activeTab === 'explore' ? 'Spots' : activeTab === 'riders' ? 'Riders' : activeTab === 'videos' ? 'Videos' : 'Arcade'}</h2>
             <p className="text-zinc-500 text-xs font-black flex items-center gap-2 uppercase tracking-widest"><Globe size={14} className="text-red-600" /> Argentina / {provinceFilter === 'All' ? 'Nacional' : provinceFilter}</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-            {activeTab !== 'videos' && (
+            {activeTab !== 'videos' && activeTab !== 'game' && (
               <select className="bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-4 text-xs font-black uppercase outline-none focus:ring-2 ring-red-600 text-white" value={provinceFilter} onChange={(e) => setProvinceFilter(e.target.value)}>
                 <option value="All">🇦🇷 Filtrar Provincia</option>
                 {PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}
@@ -468,17 +1503,48 @@ export default function App() {
                   <div className="aspect-video">
                     <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${vid.videoId}`} frameBorder="0" allowFullScreen title={vid.title}></iframe>
                   </div>
-                  <div className="p-6 flex justify-between items-center">
+                  <div className="p-6">
                     <h4 className="font-black uppercase italic text-xl text-white">{vid.title}</h4>
-                    <p className="text-[9px] font-black text-zinc-500 uppercase">RIDER: {vid.creatorName}</p>
                   </div>
                </div>
             ))}
           </div>
         )}
+
+        {/* Arcade Game Section */}
+        {activeTab === 'game' && (
+          <div className="w-full flex flex-col items-center justify-center">
+            <div className="w-full max-w-4xl bg-zinc-950 border border-purple-500/30 rounded-[2.5rem] p-2 md:p-6 shadow-2xl shadow-purple-950/40 relative">
+              <iframe
+                title="AGGRETV Endless Retro Roller"
+                srcDoc={gameSrcDoc}
+                className="w-full h-[620px] md:h-[650px] rounded-3xl border-0 overflow-hidden"
+                allow="autoplay; gamepad"
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-6 text-center font-bold">
+              🕹️ ¡Meté tu record y competí en el Ranking mundial de AGGRETV!
+            </p>
+          </div>
+        )}
       </main>
 
-      {}
+      {/* Firma de Autoría y Derechos Reservados */}
+      <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-zinc-900 text-center space-y-2 mb-10">
+        <p className="text-zinc-500 text-[11px] font-black uppercase tracking-[0.25em]">
+          Plataforma Diseñada y Desarrollada por 
+          <span className="text-red-600 hover:text-white transition-colors cursor-pointer ml-1.5">ALFREDO CIFUENTES</span>
+        </p>
+        <p className="text-zinc-600 text-[9px] font-black uppercase tracking-wider">
+          © {new Date().getFullYear()} AGGRETV. TODOS LOS DERECHOS RESERVADOS.
+        </p>
+        <p className="text-zinc-700 text-[8px] font-bold uppercase tracking-wide max-w-md mx-auto leading-relaxed">
+          Queda totalmente prohibida la copia, reproducción, imitación o distribución de esta idea, código, interfaz y mecánicas sin consentimiento expreso del autor.
+        </p>
+      </footer>
+
+      {/* Detalle Spot */}
       {selectedSpot && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/90 overflow-y-auto">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-2xl relative my-8">
@@ -594,7 +1660,7 @@ export default function App() {
         </div>
       )}
 
-      {}
+      {/* Perfil del Rider */}
       {isEditingProfile && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
           <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
