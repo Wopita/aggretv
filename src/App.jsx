@@ -133,6 +133,10 @@ export default function App() {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
+  const adminMapContainerRef = useRef(null);
+  const adminMapRef = useRef(null);
+  const adminMarkerRef = useRef(null);
+
   const isUserAdmin = useMemo(() => {
     if (!user) return false;
     if (user.email === ROOT_ADMIN) return true;
@@ -223,6 +227,10 @@ export default function App() {
       setEditProfile({ ...editProfile, photoUrl: compressed });
     } else if (mode === 'admin_rider') {
       setAdminEditingRiderData({ ...adminEditingRiderData, photoUrl: compressed });
+    } else if (mode === 'admin_spot') {
+      const newImgs = [...adminEditingSpotData.images];
+      newImgs[index] = compressed;
+      setAdminEditingSpotData({ ...adminEditingSpotData, images: newImgs });
     }
     setIsLoading(false);
   };
@@ -257,6 +265,36 @@ export default function App() {
     });
   };
 
+  useEffect(() => {
+    if (isEditingSpotByAdmin && !window.L) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setTimeout(initAdminMap, 200);
+      document.head.appendChild(script);
+    } else if (isEditingSpotByAdmin) {
+      setTimeout(initAdminMap, 200);
+    }
+  }, [isEditingSpotByAdmin, adminEditingSpotData?.id]);
+
+  const initAdminMap = () => {
+    if (!adminMapContainerRef.current || !window.L || !adminEditingSpotData) return;
+    if (adminMapRef.current) adminMapRef.current.remove();
+    const L = window.L;
+    const initialLat = parseFloat(adminEditingSpotData.lat) || -38.95;
+    const initialLng = parseFloat(adminEditingSpotData.lng) || -68.05;
+    adminMapRef.current = L.map(adminMapContainerRef.current).setView([initialLat, initialLng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(adminMapRef.current);
+    adminMarkerRef.current = L.marker([initialLat, initialLng], { draggable: true }).addTo(adminMapRef.current);
+    adminMarkerRef.current.on('dragend', () => {
+      const pos = adminMarkerRef.current.getLatLng();
+      setAdminEditingSpotData(prev => ({ ...prev, lat: pos.lat.toFixed(6), lng: pos.lng.toFixed(6) }));
+    });
+  };
+
   const handleSearchAddress = async (val) => {
     if (val.length < 3) return;
     try {
@@ -272,6 +310,25 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleAdminSearchAddress = async (val) => {
+    if (val.length < 3) return;
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&countrycodes=ar`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const pos = [parseFloat(lat), parseFloat(lon)];
+        if (adminMapRef.current) {
+          adminMapRef.current.setView(pos, 16);
+        }
+        if (adminMarkerRef.current) {
+          adminMarkerRef.current.setLatLng(pos);
+        }
+        setAdminEditingSpotData(prev => ({ ...prev, lat: lat, lng: lon }));
+      }
+    } catch (e) {}
+  };
+
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -282,6 +339,21 @@ export default function App() {
         markerRef.current.setLatLng(coords);
       }
       setNewSpot(prev => ({ ...prev, lat: latitude.toFixed(6), lng: longitude.toFixed(6) }));
+    });
+  };
+
+  const handleAdminGetCurrentLocation = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      const coords = [latitude, longitude];
+      if (adminMapRef.current) {
+        adminMapRef.current.setView(coords, 16);
+      }
+      if (adminMarkerRef.current) {
+        adminMarkerRef.current.setLatLng(coords);
+      }
+      setAdminEditingSpotData(prev => ({ ...prev, lat: latitude.toFixed(6), lng: longitude.toFixed(6) }));
     });
   };
 
@@ -346,18 +418,40 @@ export default function App() {
     } finally { setIsLoading(false); }
   };
 
+  const handleEditSpotClick = (spot) => {
+    const formattedImages = [...(spot.images || [])];
+    while (formattedImages.length < 4) {
+      formattedImages.push('');
+    }
+    setAdminEditingSpotData({ ...spot, images: formattedImages });
+    setIsEditingSpotByAdmin(true);
+  };
+
   const handleAdminSaveSpot = async (e) => {
     e.preventDefault();
     if (!adminEditingSpotData) return;
     setIsLoading(true);
     try {
-      await updateDoc(doc(db, 'spots', adminEditingSpotData.id), adminEditingSpotData);
+      const validImages = adminEditingSpotData.images.filter(url => url && url.trim() !== '');
+      const spotId = adminEditingSpotData.id;
+      
+      const updatedData = {
+        title: adminEditingSpotData.title,
+        city: adminEditingSpotData.city,
+        province: adminEditingSpotData.province,
+        type: adminEditingSpotData.type,
+        description: adminEditingSpotData.description,
+        lat: adminEditingSpotData.lat,
+        lng: adminEditingSpotData.lng,
+        images: validImages
+      };
+
+      await updateDoc(doc(db, 'spots', spotId), updatedData);
       setIsEditingSpotByAdmin(false);
       setSelectedSpot(null);
     } finally { setIsLoading(false); }
   };
 
-  // Codificación segura del juego retro adaptado a iframe con comunicación online a Firestore
   const gameSrcDoc = useMemo(() => {
     const profileNameSanitized = userProfile?.name
       ? userProfile.name.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_ñÑ]/g, '').slice(0, 12).toUpperCase()
@@ -493,7 +587,6 @@ export default function App() {
             </div>
         </div>
     
-        <!-- Teclera virtual unificada y táctil ergonómica para celulares de cualquier tamaño -->
         <div id="mobileControls" class="w-full grid grid-cols-2 gap-3 mt-3 px-1 md:hidden select-none touch-none">
             <div class="grid grid-cols-2 gap-2">
                 <button id="btnJump" class="bg-red-600 border border-white/20 rounded-2xl py-3.5 flex flex-col items-center justify-center font-black text-xs tracking-tight shadow-lg shadow-red-600/15 active:bg-red-500 active:scale-95 transition-all">
@@ -770,7 +863,7 @@ export default function App() {
         trickDisplayTimer: 0,
         animFrame: 0,
         baseSpeedX: 4.0, 
-        speedX: 4.0,     
+        speedX: 4.0,      
         crashed: false
     };
     
@@ -783,7 +876,7 @@ export default function App() {
             y: y,
             vx: (Math.random() - 0.5) * 6,
             vy: -Math.random() * 4,
-            color: \"hsl(\${Math.random() * 50 + 320}, 100%, 60%)\", 
+            color: "hsl(" + (Math.random() * 50 + 320) + ", 100%, 60%)", 
             size: Math.random() * 3 + 2,
             life: 1.0
         });
@@ -870,7 +963,6 @@ export default function App() {
         keys[e.code] = false;
     });
     
-    // Bind táctil súper optimizado para evitar "inputs trabados" (stuck touches) en celulares
     function bindTouchControl(elementId, keyToTrigger) {
         const btn = document.getElementById(elementId);
         if (!btn) return;
@@ -879,7 +971,7 @@ export default function App() {
             e.preventDefault();
             keys[keyToTrigger] = true;
             if (navigator.vibrate) {
-                try { navigator.vibrate(10); } catch(err) {} // Vibración hápitca súper premium para feedback de control
+                try { navigator.vibrate(10); } catch(err) {}
             }
         };
     
@@ -888,18 +980,15 @@ export default function App() {
             keys[keyToTrigger] = false;
         };
     
-        // Soporte nativo para pantallas táctiles de cualquier celular
         btn.addEventListener("touchstart", press, { passive: false });
         btn.addEventListener("touchend", release, { passive: false });
         btn.addEventListener("touchcancel", release, { passive: false });
     
-        // Soporte fallback para mouse (emulador de escritorio o tablets con puntero)
         btn.addEventListener("mousedown", press);
         btn.addEventListener("mouseup", release);
         btn.addEventListener("mouseleave", release);
     }
     
-    // Vinculación de los nuevos botones de Arcade Mobile adaptables
     bindTouchControl("btnJump", "ArrowUp");
     bindTouchControl("btnGrind", "Space");
     bindTouchControl("btnTrickZ", "KeyZ");
@@ -907,7 +996,7 @@ export default function App() {
     bindTouchControl("btnTrickC", "KeyC");
     
     function triggerAirTrick(name, points) {
-        player.currentTrick = \`\${name}! +\${points}\`;
+        player.currentTrick = name + "! +" + points;
         player.trickDisplayTimer = 45;
         player.combo += points;
         player.multiplier += 1;
@@ -923,7 +1012,6 @@ export default function App() {
         flashAlpha = 0.8; 
         AudioEngine.sfxCrash();
         
-        // Haptic feedback de choque (fuerte vibración intermitente si el celu lo soporta)
         if (navigator.vibrate) {
             try { navigator.vibrate([80, 50, 120]); } catch(err) {}
         }
@@ -939,7 +1027,7 @@ export default function App() {
     
         document.getElementById("gameOverReason").innerText = reason;
         document.getElementById("finalScore").innerText = player.score;
-        document.getElementById("finalDistance").innerText = \`\${Math.floor(player.distance)}m\`;
+        document.getElementById("finalDistance").innerText = Math.floor(player.distance) + "m";
         document.getElementById("bestRecord").innerText = personalHighScore;
         document.getElementById("finalRiderName").innerText = activeRiderName;
     }
@@ -951,17 +1039,12 @@ export default function App() {
     
         const buildHTML = (list) => {
             if (list.length === 0) {
-                return \`<div class="text-center text-gray-500 py-4">SIN REGISTROS AÚN</div>\`;
+                return '<div class="text-center text-gray-500 py-4">SIN REGISTROS AÚN</div>';
             }
             return list.slice(0, 5).map((u, i) => {
-                const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : \`\${i+1}.\`;
+                const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i+1) + ".";
                 const labelColor = i === 0 ? "text-yellow-400" : i === 1 ? "text-cyan-300" : i === 2 ? "text-pink-400" : "text-gray-300";
-                return \`
-                    <div class="flex justify-between items-center \${labelColor} text-[8px] tracking-wide">
-                        <span>\${medal} \${u.riderName.toUpperCase()}</span>
-                        <span>\${u.score} pts</span>
-                    </div>
-                \`;
+                return '<div class="flex justify-between items-center ' + labelColor + ' text-[8px] tracking-wide"><span>' + medal + ' ' + u.riderName.toUpperCase() + '</span><span>' + u.score + ' pts</span></div>';
             }).join("");
         };
     
@@ -1292,7 +1375,7 @@ export default function App() {
         ctx.restore(); 
     
         if (flashAlpha > 0) {
-            ctx.fillStyle = \`rgba(255, 0, 0, \${flashAlpha})\`;
+            ctx.fillStyle = "rgba(255, 0, 0, " + flashAlpha + ")";
             ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
         }
     
@@ -1305,11 +1388,11 @@ export default function App() {
         ctx.fillStyle = "#ffffff";
         ctx.font = "7px 'Press Start 2P'";
         ctx.textAlign = "left";
-        ctx.fillText(\`RAIDER: \${activeRiderName.toUpperCase()}\`, 25, 31);
-        ctx.fillText(\`PUNTAJE: \${player.score}\`, 25, 45);
-        ctx.fillText(\`DISTANCIA: \${Math.floor(player.distance)}m\`, 25, 59);
-        ctx.fillText(\`MULTI: x\${player.multiplier}\`, 25, 73);
-        ctx.fillText(\`VEL: \${(player.speedX * 5).toFixed(0)} KM/H\`, 25, 85);
+        ctx.fillText("RAIDER: " + activeRiderName.toUpperCase(), 25, 31);
+        ctx.fillText("PUNTAJE: " + player.score, 25, 45);
+        ctx.fillText("DISTANCIA: " + Math.floor(player.distance) + "m", 25, 59);
+        ctx.fillText("MULTI: x" + player.multiplier, 25, 73);
+        ctx.fillText("VEL: " + (player.speedX * 5).toFixed(0) + " KM/H", 25, 85);
     
         if (player.isGrinding) {
             ctx.fillStyle = "#ff007f";
@@ -1512,6 +1595,7 @@ export default function App() {
         )}
 
         {/* Riders Grid */}
+        {}
         {activeTab === 'riders' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {riders.filter(r => provinceFilter === 'All' || r.province === provinceFilter).map(rider => (
@@ -1605,7 +1689,7 @@ export default function App() {
                  
                  {isUserAdmin && (
                    <div className="flex gap-2">
-                     <Button variant="secondary" onClick={() => { setAdminEditingSpotData(selectedSpot); setIsEditingSpotByAdmin(true); }} className="w-14 p-0"><Edit3 size={20} /></Button>
+                     <Button variant="secondary" onClick={() => handleEditSpotClick(selectedSpot)} className="w-14 p-0"><Edit3 size={20} /></Button>
                      <Button variant="danger" onClick={() => { deleteDoc(doc(db, 'spots', selectedSpot.id)); setSelectedSpot(null); }} className="w-14 p-0"><Trash2 size={20} /></Button>
                    </div>
                  )}
@@ -1615,83 +1699,219 @@ export default function App() {
         </div>
       )}
 
-      {isEditingSpotByAdmin && adminEditingSpotData && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
-          <div className="bg-zinc-950 border border-red-600 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsEditingSpotByAdmin(false)} className="absolute top-6 right-6 z-[260] bg-red-600 p-4 rounded-full"><X size={24} className="text-white" /></button>
-            <h3 className="text-3xl font-black italic uppercase mb-8 text-white">Editar <span className="text-red-600">Spot</span></h3>
-            <form onSubmit={handleAdminSaveSpot} className="space-y-6">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none focus:ring-1 ring-red-600" placeholder="Nombre" value={adminEditingSpotData.title} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, title: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" placeholder="Ciudad" value={adminEditingSpotData.city} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, city: e.target.value})} />
-                <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingSpotData.province} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, province: e.target.value})}>{PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}</select>
-              </div>
-              <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingSpotData.type} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, type: e.target.value})}>{SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
-              <textarea className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none h-24 text-xs" placeholder="Descripción..." value={adminEditingSpotData.description} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, description: e.target.value})} />
-              <Button type="submit" className="w-full py-5" isLoading={isLoading}>ACTUALIZAR SPOT</Button>
-            </form>
-          </div>
-        </div>
-      )}
+      {}
+      {/* Detalle de Rider Público (Nuevo Modal Corregido) */}
+      {selectedRider && !isEditingRiderByAdmin && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/90 overflow-y-auto">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl relative my-8 text-center space-y-6">
+            <button 
+              onClick={() => setSelectedRider(null)} 
+              className="absolute top-6 right-6 z-20 bg-red-600 p-3 rounded-full border border-white/20 text-white hover:bg-red-500 transition-all cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="w-32 h-32 mx-auto bg-zinc-900 border-2 border-red-600 rounded-[2rem] flex items-center justify-center overflow-hidden shadow-2xl">
+              {selectedRider.photoUrl ? (
+                <img src={selectedRider.photoUrl} className="w-full h-full object-cover" alt={selectedRider.name} />
+              ) : (
+                <User size={64} className="text-red-600 animate-pulse" />
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-3xl font-black italic uppercase text-white">{selectedRider.name}</h3>
+              <p className="text-zinc-500 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5">
+                <MapPin size={14} className="text-red-600" /> {selectedRider.city || 'Sin especificar'} • {selectedRider.province}
+              </p>
+            </div>
+            
+            {selectedRider.bio ? (
+              <p className="text-zinc-300 text-sm italic border-l-4 border-red-600 pl-6 text-left leading-relaxed max-w-md mx-auto">
+                "{selectedRider.bio}"
+              </p>
+            ) : (
+              <p className="text-zinc-600 text-xs italic">"Este Rider todavía no cargó su biografía de patín..."</p>
+            )}
 
-      {selectedRider && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
-          <div className="bg-zinc-950 border border-zinc-800 p-10 rounded-[3rem] w-full max-w-md relative text-center">
-            <button onClick={() => setSelectedRider(null)} className="absolute top-6 right-6 bg-red-600 p-4 rounded-full"><X size={20} className="text-white" /></button>
-            <div className="w-40 h-40 mx-auto bg-zinc-900 border-4 border-red-600 rounded-[2.5rem] mb-8 overflow-hidden shadow-2xl">
-              {selectedRider.photoUrl ? <img src={selectedRider.photoUrl} className="w-full h-full object-cover" alt="Detail" /> : <User size={80} className="text-zinc-700 w-full h-full p-8" />}
+            <div className="flex gap-4 pt-4">
+              {selectedRider.instagram ? (
+                <a 
+                  href={`https://instagram.com/${selectedRider.instagram.replace('@', '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-wider border border-zinc-800 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+                >
+                  <InstagramIcon size={16} /> Instagram
+                </a>
+              ) : (
+                <div className="flex-grow text-[9px] font-black uppercase text-zinc-700 py-3 border border-zinc-900 rounded-xl">Sin Instagram</div>
+              )}
+              {selectedRider.whatsapp ? (
+                <a 
+                  href={`https://wa.me/${selectedRider.whatsapp.replace(/\D/g, '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3.5 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-600/25 cursor-pointer"
+                >
+                  <WhatsAppIcon size={16} /> WhatsApp
+                </a>
+              ) : (
+                <div className="flex-grow text-[9px] font-black uppercase text-zinc-700 py-3 border border-zinc-900 rounded-xl">Sin WhatsApp</div>
+              )}
             </div>
-            <h3 className="text-3xl font-black italic uppercase text-white leading-none">{selectedRider.name}</h3>
-            <p className="text-red-600 text-[10px] font-black uppercase tracking-[0.2em] mt-3">{selectedRider.city} • {selectedRider.province}</p>
-            <p className="text-zinc-400 text-sm mt-6 mb-8 italic">"{selectedRider.bio || 'Sin biografía...'}"</p>
-            <div className="flex gap-4">
-              {selectedRider.instagram && <Button variant="secondary" className="flex-1" onClick={() => window.open(`https://instagram.com/${selectedRider.instagram}`, '_blank')}><InstagramIcon size={18}/> IG</Button>}
-              {selectedRider.whatsapp && <Button variant="secondary" className="flex-1" onClick={() => window.open(`https://wa.me/${selectedRider.whatsapp}`, '_blank')}><WhatsAppIcon size={18}/> WSP</Button>}
-            </div>
+
             {isUserAdmin && (
-              <div className="pt-8 border-t border-zinc-900 mt-8 space-y-4">
-                <p className="text-[10px] font-black uppercase text-red-600 tracking-widest">Controles de Administrador</p>
-                <div className="flex gap-3">
-                  <Button variant="primary" className="flex-1" onClick={() => { setAdminEditingRiderData(selectedRider); setIsEditingRiderByAdmin(true); }}>EDITAR RIDER</Button>
-                  <Button variant="danger" className="w-14" onClick={() => { deleteDoc(doc(db, 'profiles', selectedRider.id)); setSelectedRider(null); }}><Trash2 size={20} /></Button>
-                </div>
+              <div className="pt-4 border-t border-zinc-900/60">
+                <Button 
+                  variant="secondary" 
+                  onClick={() => {
+                    setAdminEditingRiderData(selectedRider);
+                    setIsEditingRiderByAdmin(true);
+                  }} 
+                  className="w-full py-4 text-xs"
+                >
+                  <Edit3 size={16} /> EDITAR RIDER (ADMIN)
+                </Button>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Formulario Nuevo Spot */}
-      {isAddingSpot && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/80 overflow-y-auto">
-          <div className="bg-zinc-950 border border-red-600/30 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsAddingSpot(false)} className="absolute top-6 right-6 z-[210] bg-red-600 p-4 rounded-full border border-white/20"><X size={24} className="text-white" /></button>
-            <h3 className="text-3xl font-black italic uppercase text-white mb-6">Nuevo <span className="text-red-600">Spot</span></h3>
-            <form onSubmit={handleAddSpot} className="space-y-5">
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white border border-transparent focus:border-red-600 outline-none" placeholder="Nombre" value={newSpot.title} onChange={e => setNewSpot({...newSpot, title: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" placeholder="Ciudad" value={newSpot.city} onChange={e => setNewSpot({...newSpot, city: e.target.value})} />
-                <select className="bg-zinc-900 p-4 rounded-xl text-white outline-none" value={newSpot.province} onChange={e => setNewSpot({...newSpot, province: e.target.value})}>{PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}</select>
-              </div>
-              <textarea className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none h-24 text-sm" placeholder="Detalles de seguridad, piso, etc..." value={newSpot.description} onChange={e => setNewSpot({...newSpot, description: e.target.value})} />
-              
-              <div className="space-y-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
-                <div className="flex gap-2">
-                  <input className="flex-1 bg-zinc-950 p-3 rounded-lg text-xs outline-none focus:ring-1 ring-red-600" placeholder="Buscar dirección..." onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), handleSearchAddress(e.target.value))} />
-                  <Button type="button" onClick={handleGetCurrentLocation} className="p-3"><Zap size={14} /></Button>
-                </div>
-                <div ref={mapContainerRef} className="h-[250px] rounded-xl overflow-hidden border border-zinc-800 bg-zinc-800" />
+      {/* Modal de Edición de Spot por Administrador - Full Imagenes y Direcciones */}
+      {}
+      {isEditingSpotByAdmin && adminEditingSpotData && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
+          <div className="bg-zinc-950 border border-red-600 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
+            <button onClick={() => setIsEditingSpotByAdmin(false)} className="absolute top-6 right-6 z-[260] bg-red-600 p-4 rounded-full"><X size={24} className="text-white" /></button>
+            <h3 className="text-3xl font-black italic uppercase mb-8 text-white">Editar <span className="text-red-600">Spot</span></h3>
+            
+            <form onSubmit={handleAdminSaveSpot} className="space-y-6">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Nombre del Spot</label>
+                <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white border border-transparent focus:border-red-600 outline-none" placeholder="Nombre" value={adminEditingSpotData.title} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, title: e.target.value})} />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {newSpot.images.map((img, i) => (
-                  <div key={i} className="relative h-20 bg-zinc-900 border-2 border-dashed border-zinc-800 rounded-lg flex items-center justify-center overflow-hidden">
-                    {img ? <img src={img} className="w-full h-full object-cover" alt="Upload" /> : <Camera size={20} className="text-zinc-600" />}
-                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, i, 'spot')} />
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Ciudad</label>
+                  <input className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" placeholder="Ciudad" value={adminEditingSpotData.city} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, city: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Provincia</label>
+                  <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingSpotData.province} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, province: e.target.value})}>{PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                </div>
               </div>
-              <Button type="submit" className="w-full py-5 text-sm" isLoading={isLoading}>PUBLICAR SPOT</Button>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Obstáculo Principal</label>
+                <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingSpotData.type} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, type: e.target.value})}>{SPOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Descripción</label>
+                <textarea className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none h-24 text-xs" placeholder="Descripción..." value={adminEditingSpotData.description} onChange={e => setAdminEditingSpotData({...adminEditingSpotData, description: e.target.value})} />
+              </div>
+
+              {/* Modificación de Imágenes del Spot (Cambiar y Borrar) */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Modificar Imágenes (Max 4)</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {adminEditingSpotData.images.map((img, i) => (
+                    <div key={i} className="relative h-20 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-center overflow-hidden group/img">
+                      {img ? (
+                        <>
+                          <img src={img} className="w-full h-full object-cover" alt={`Edit Slot ${i}`} />
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const clearedImgs = [...adminEditingSpotData.images];
+                              clearedImgs[i] = '';
+                              setAdminEditingSpotData({ ...adminEditingSpotData, images: clearedImgs });
+                            }} 
+                            className="absolute top-1 right-1 bg-red-600 hover:bg-red-500 p-1 rounded-full text-white shadow-md active:scale-90 transition-all opacity-0 group-hover/img:opacity-100"
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="relative w-full h-full flex flex-col items-center justify-center cursor-pointer">
+                          <Camera size={18} className="text-zinc-600 mb-1" />
+                          <span className="text-[8px] font-black uppercase text-zinc-500">Subir</span>
+                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleImageUpload(e, i, 'admin_spot')} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modificación interactiva de Dirección y Coordenadas */}
+              <div className="space-y-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+                <label className="block text-[10px] font-black uppercase text-zinc-400 tracking-wider">Ubicación y Coordenadas</label>
+                <div className="flex gap-2">
+                  <input className="flex-1 bg-zinc-950 p-3 rounded-lg text-xs outline-none focus:ring-1 ring-red-600 text-white" placeholder="Buscar nueva dirección..." onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), handleAdminSearchAddress(e.target.value))} />
+                  <Button type="button" onClick={handleAdminGetCurrentLocation} className="p-3"><Zap size={14} /></Button>
+                </div>
+                <div ref={adminMapContainerRef} className="h-[200px] rounded-xl overflow-hidden border border-zinc-800 bg-zinc-800 z-10" />
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block text-[8px] font-black uppercase text-zinc-500 mb-1">Latitud</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      className="w-full bg-zinc-950 p-3 rounded-lg text-white outline-none border border-zinc-800 focus:border-red-600" 
+                      value={adminEditingSpotData.lat || ''} 
+                      onChange={e => setAdminEditingSpotData({...adminEditingSpotData, lat: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black uppercase text-zinc-500 mb-1">Longitud</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      className="w-full bg-zinc-950 p-3 rounded-lg text-white outline-none border border-zinc-800 focus:border-red-600" 
+                      value={adminEditingSpotData.lng || ''} 
+                      onChange={e => setAdminEditingSpotData({...adminEditingSpotData, lng: e.target.value})} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full py-5" isLoading={isLoading}>ACTUALIZAR SPOT</Button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edición Rider por Admin */}
+      {isEditingRiderByAdmin && adminEditingRiderData && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
+          <div className="bg-zinc-950 border border-red-600 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
+            <button onClick={() => setIsEditingRiderByAdmin(false)} className="absolute top-6 right-6 z-[260] bg-red-600 p-4 rounded-full"><X size={24} className="text-white" /></button>
+            <h3 className="text-3xl font-black italic uppercase mb-8 text-white">Editar <span className="text-red-600">Rider</span></h3>
+            <form onSubmit={handleAdminSaveRider} className="space-y-6">
+              <div className="flex flex-col items-center">
+                <label className="relative cursor-pointer group">
+                  <div className="w-32 h-32 rounded-[2rem] bg-zinc-900 border-2 border-red-600 flex items-center justify-center overflow-hidden">
+                    {adminEditingRiderData.photoUrl ? <img src={adminEditingRiderData.photoUrl} className="w-full h-full object-cover" alt="User" /> : <User size={48} className="text-red-600" />}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 0, 'admin_rider')} />
+                  <div className="absolute -bottom-2 -right-2 bg-red-600 p-3 rounded-full"><Camera size={14} className="text-white"/></div>
+                </label>
+              </div>
+              <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none focus:ring-1 ring-red-600" placeholder="Alias" value={adminEditingRiderData.name} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, name: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" placeholder="Ciudad" value={adminEditingRiderData.city} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, city: e.target.value})} />
+                <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingRiderData.province} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, province: e.target.value})}>{PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}</select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white text-xs outline-none" placeholder="Instagram" value={adminEditingRiderData.instagram || ''} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, instagram: e.target.value})} />
+                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white text-xs outline-none" placeholder="WhatsApp" value={adminEditingRiderData.whatsapp || ''} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, whatsapp: e.target.value})} />
+              </div>
+              <textarea className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none h-24 text-xs" placeholder="Biografía..." value={adminEditingRiderData.bio || ''} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, bio: e.target.value})} />
+              <Button type="submit" className="w-full py-5" isLoading={isLoading}>ACTUALIZAR PERFIL RIDER</Button>
             </form>
           </div>
         </div>
@@ -1736,38 +1956,6 @@ export default function App() {
                 <Button type="submit" className="w-full py-5" isLoading={isLoading}>GUARDAR CAMBIOS</Button>
                 <button type="button" onClick={() => signOut(auth)} className="w-full text-zinc-500 hover:text-red-600 text-[10px] font-black uppercase py-4 transition-colors">Cerrar Sesión</button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Edición Rider por Admin */}
-      {isEditingRiderByAdmin && adminEditingRiderData && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 backdrop-blur-md bg-black/95 overflow-y-auto">
-          <div className="bg-zinc-950 border border-red-600 p-8 rounded-[2rem] w-full max-w-lg shadow-2xl my-8 relative">
-            <button onClick={() => setIsEditingRiderByAdmin(false)} className="absolute top-6 right-6 z-[260] bg-red-600 p-4 rounded-full"><X size={24} className="text-white" /></button>
-            <h3 className="text-3xl font-black italic uppercase mb-8 text-white">Editar <span className="text-red-600">Rider</span></h3>
-            <form onSubmit={handleAdminSaveRider} className="space-y-6">
-              <div className="flex flex-col items-center">
-                <label className="relative cursor-pointer group">
-                  <div className="w-32 h-32 rounded-[2rem] bg-zinc-900 border-2 border-red-600 flex items-center justify-center overflow-hidden">
-                    {adminEditingRiderData.photoUrl ? <img src={adminEditingRiderData.photoUrl} className="w-full h-full object-cover" alt="User" /> : <User size={48} className="text-red-600" />}
-                  </div>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 0, 'admin_rider')} />
-                  <div className="absolute -bottom-2 -right-2 bg-red-600 p-3 rounded-full"><Camera size={14} className="text-white"/></div>
-                </label>
-              </div>
-              <input required className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none focus:ring-1 ring-red-600" placeholder="Alias" value={adminEditingRiderData.name} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, name: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" placeholder="Ciudad" value={adminEditingRiderData.city} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, city: e.target.value})} />
-                <select className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none" value={adminEditingRiderData.province} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, province: e.target.value})}>{PROVINCIAS_ARGENTINA.map(p => <option key={p} value={p}>{p}</option>)}</select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white text-xs outline-none" placeholder="Instagram" value={adminEditingRiderData.instagram || ''} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, instagram: e.target.value})} />
-                <input className="w-full bg-zinc-900 p-4 rounded-xl text-white text-xs outline-none" placeholder="WhatsApp" value={adminEditingRiderData.whatsapp || ''} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, whatsapp: e.target.value})} />
-              </div>
-              <textarea className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none h-24 text-xs" placeholder="Biografía..." value={adminEditingRiderData.bio || ''} onChange={e => setAdminEditingRiderData({...adminEditingRiderData, bio: e.target.value})} />
-              <Button type="submit" className="w-full py-5" isLoading={isLoading}>ACTUALIZAR PERFIL RIDER</Button>
             </form>
           </div>
         </div>
